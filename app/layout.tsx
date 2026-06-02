@@ -14,6 +14,15 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.svg",
   },
+  openGraph: {
+    title: "SwiftMint Exchange",
+    description:
+      "Premium outbound mobile money facilitation from Malawi to selected African countries.",
+    url: "https://swiftmint.exchange",
+    siteName: "SwiftMint Exchange",
+    locale: "en_MW",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

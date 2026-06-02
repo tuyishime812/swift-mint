@@ -6,12 +6,11 @@ import { Menu, MessageCircle, X } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
-  { href: "/service", label: "Service" },
-  { href: "/countries", label: "Countries" },
-  { href: "/pricing", label: "Pricing" },
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/transfer", label: "Transfer" },
+  { href: "/pay", label: "Pay" },
+  { href: "/countries", label: "Countries" },
   { href: "/faq", label: "FAQ" },
-  { href: "/contact", label: "Contact" },
 ];
 
 export function SiteHeader() {

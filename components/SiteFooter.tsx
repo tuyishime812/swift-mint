@@ -14,6 +14,8 @@ export function SiteFooter() {
           <Link href="/pricing">Pricing</Link>
           <Link href="/faq">FAQ</Link>
           <Link href="/contact">Contact</Link>
+          <Link href="/privacy">Privacy Policy</Link>
+          <Link href="/terms">Terms of Service</Link>
         </div>
         <div className="footer-col">
           <strong className="footer-heading">Send to</strong>
@@ -29,6 +31,12 @@ export function SiteFooter() {
               {c.name}
             </Link>
           ))}
+        </div>
+        <div className="footer-col">
+          <strong className="footer-heading">My Account</strong>
+          <Link href="/dashboard">Dashboard</Link>
+          <Link href="/transfer">New Transfer</Link>
+          <Link href="/pay">Make a Payment</Link>
         </div>
         <div className="footer-col">
           <strong className="footer-heading">Support</strong>
