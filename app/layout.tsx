@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { CookieBanner } from "@/components/CookieBanner";
+import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -36,12 +37,14 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
-        <SiteHeader />
-        <div id="main-content">
-          {children}
-        </div>
-        <SiteFooter />
-        <CookieBanner />
+        <AuthProvider>
+          <SiteHeader />
+          <div id="main-content" className="layout-main">
+            {children}
+          </div>
+          <SiteFooter />
+          <CookieBanner />
+        </AuthProvider>
       </body>
     </html>
   );

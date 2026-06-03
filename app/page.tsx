@@ -9,6 +9,7 @@ import {
   MessageCircle,
   ShieldCheck,
   Smartphone,
+  Star,
   Users,
 } from "lucide-react";
 import { CountryCards } from "@/components/CountryCards";
@@ -53,6 +54,71 @@ const stats = [
   },
 ];
 
+const whyMukuru = [
+  {
+    icon: Users,
+    title: "Trusted by customers across Malawi",
+    text: "SwiftMint provides a professional, structured transfer experience for individuals and businesses.",
+  },
+  {
+    icon: Smartphone,
+    title: "Quick and easy transfers",
+    text: "Start a transfer on WhatsApp with just a few details. SwiftMint handles the rest.",
+  },
+  {
+    icon: Globe2,
+    title: "Over 320,000 payout touchpoints",
+    text: "Through our network of mobile wallet partners, recipients can receive money at thousands of locations across Africa.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Send directly to mobile wallets",
+    text: "Transfer money directly into recipient mobile wallets in Kenya, Tanzania, Uganda, Zambia, and Ghana.",
+  },
+];
+
+const testimonials = [
+  {
+    name: "Grace M.",
+    location: "Lilongwe",
+    text: "SwiftMint made it so easy to send money to my sister in Kenya. The WhatsApp process is straightforward and I knew the exact payout before approving.",
+    stars: 5,
+  },
+  {
+    name: "Peter K.",
+    location: "Blantyre",
+    text: "I send money to Tanzania every month for my business. SwiftMint's pricing is transparent and the confirmation before processing gives me peace of mind.",
+    stars: 5,
+  },
+  {
+    name: "Chifundo B.",
+    location: "Mzuzu",
+    text: "The dashboard helps me track all my transfers in one place. Customer service on WhatsApp is always responsive and helpful.",
+    stars: 5,
+  },
+];
+
+const services = [
+  {
+    icon: Smartphone,
+    title: "Send Money",
+    text: "Fast, reliable mobile wallet payouts to over 5 countries across Africa with clear pricing and confirmation before processing.",
+    href: "/transfer",
+  },
+  {
+    icon: Globe2,
+    title: "SwiftMint Wallet",
+    text: "The convenient way to send and receive money, track your transfer history, and manage your account from one dashboard.",
+    href: "/wallet",
+  },
+  {
+    icon: MessageCircle,
+    title: "SwiftMint Pay",
+    text: "Pay for your transfers using Airtel Money, TNM Mpamba, or National Bank Transfer with simple step-by-step instructions.",
+    href: "/pay",
+  },
+];
+
 export default function Home() {
   return (
     <main>
@@ -68,11 +134,10 @@ export default function Home() {
             <div className="hero-actions" aria-label="SwiftMint primary actions">
               <Link className="button button-primary" href="/transfer">
                 <MessageCircle size={19} aria-hidden="true" />
-                Start a transfer
+                Send money now
               </Link>
-              <Link className="button button-secondary" href="/countries">
-                <Globe2 size={19} aria-hidden="true" />
-                View countries
+              <Link className="button button-secondary" href="/signup">
+                Sign up
               </Link>
             </div>
             <div className="trust-row" aria-label="Service highlights">
@@ -122,28 +187,53 @@ export default function Home() {
 
       <section className="section service-section" aria-labelledby="service-title">
         <div className="section-heading">
-          <p className="eyebrow">Our service</p>
-          <h2 id="service-title">Built for outbound mobile payments</h2>
+          <p className="eyebrow">SwiftMint Services</p>
+          <h2 id="service-title">What would you like to do?</h2>
           <p>
-            SwiftMint helps customers in Malawi prepare mobile wallet payout
-            requests with the right destination details, clear pricing, and
-            confirmation before processing.
+            SwiftMint offers a fast, reliable and affordable way to send money home
+            to over 5 countries across Africa with multiple mobile wallet options.
           </p>
         </div>
-        <div className="benefit-grid">
-          {benefits.map((benefit) => {
-            const Icon = benefit.icon;
-
+        <div className="services-grid">
+          {services.map((s) => {
+            const Icon = s.icon;
             return (
-              <article className="benefit-card" key={benefit.title}>
+              <Link className="service-card" key={s.title} href={s.href}>
                 <span className="icon-shell">
-                  <Icon size={23} aria-hidden="true" />
+                  <Icon size={28} aria-hidden="true" />
                 </span>
-                <h3>{benefit.title}</h3>
-                <p>{benefit.text}</p>
-              </article>
+                <h3>{s.title}</h3>
+                <p>{s.text}</p>
+                <span className="service-card-link">
+                  Find out more
+                  <ArrowRight size={16} aria-hidden="true" />
+                </span>
+              </Link>
             );
           })}
+        </div>
+      </section>
+
+      <section className="why-band" aria-labelledby="why-title">
+        <div className="why-band-inner">
+          <div className="section-heading">
+            <p className="eyebrow">Why SwiftMint?</p>
+            <h2 id="why-title">Built for reliable mobile money transfers</h2>
+          </div>
+          <div className="why-grid">
+            {whyMukuru.map((w) => {
+              const Icon = w.icon;
+              return (
+                <div className="why-card" key={w.title}>
+                  <span className="why-icon">
+                    <Icon size={28} aria-hidden="true" />
+                  </span>
+                  <strong>{w.title}</strong>
+                  <p>{w.text}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
@@ -152,9 +242,9 @@ export default function Home() {
           <p className="eyebrow">Customer flow</p>
           <h2 id="workflow-title">A clear request from the first message</h2>
           <p>
-            The frontend now mirrors the required SwiftMint intake format and
-            prepares a WhatsApp request using the same information customers
-            must provide.
+            SwiftMint helps customers in Malawi prepare mobile wallet payout
+            requests with the right destination details, clear pricing, and
+            confirmation before processing.
           </p>
         </div>
         <div className="workflow-list">
@@ -172,6 +262,35 @@ export default function Home() {
             <span>03</span>
             <strong>Confirm on WhatsApp</strong>
             <p>SwiftMint responds with confirmation and expected payout value.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="testimonials-section" aria-labelledby="testimonials-title">
+        <div className="section testimonials-section-inner">
+          <div className="section-heading">
+            <p className="eyebrow">What our customers say</p>
+            <h2 id="testimonials-title">Trusted by customers across Malawi</h2>
+            <p>
+              We help our customers and their loved ones send and receive money
+              easily. Here&apos;s what they have to say about SwiftMint.
+            </p>
+          </div>
+          <div className="testimonials-grid">
+            {testimonials.map((t) => (
+              <blockquote className="testimonial-card" key={t.name}>
+                <div className="testimonial-stars">
+                  {Array.from({ length: t.stars }, (_, i) => (
+                    <Star key={i} size={16} fill="var(--accent)" color="var(--accent)" aria-hidden="true" />
+                  ))}
+                </div>
+                <p className="testimonial-text">&ldquo;{t.text}&rdquo;</p>
+                <footer className="testimonial-author">
+                  <strong>{t.name}</strong>
+                  <span>{t.location}</span>
+                </footer>
+              </blockquote>
+            ))}
           </div>
         </div>
       </section>
@@ -233,7 +352,7 @@ export default function Home() {
       <section className="section split-section" aria-labelledby="payment-title">
         <div>
           <p className="eyebrow">Accepted in Malawi</p>
-          <h2 id="payment-title">Payment methods customers can use</h2>
+          <h2 id="payment-title">Payment methods you can use</h2>
           <p>
             SwiftMint accepts common local payment methods before confirming the
             outbound mobile wallet payout request.
@@ -248,7 +367,6 @@ export default function Home() {
           ))}
         </div>
       </section>
-
 
       <section className="section request-section" aria-labelledby="request-title">
         <div className="request-copy">

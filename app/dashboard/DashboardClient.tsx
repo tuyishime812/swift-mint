@@ -1,57 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Banknote,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Download,
-  Globe2,
+  Filter,
   Loader2,
   MessageCircle,
-  RefreshCw,
-  Smartphone,
+  Search,
   TrendingUp,
   Wallet,
+  X,
   XCircle,
 } from "lucide-react";
-import { countries, formattedWhatsappNumber } from "@/lib/swiftmint";
+import { useAuth } from "@/lib/auth";
+import {
+  type TransactionData,
+  apiGetTransactions,
+  apiUpdateTransactionStatus,
+  apiDeleteTransaction,
+} from "@/lib/api";
+import { formattedWhatsappNumber } from "@/lib/swiftmint";
 
-type TransferRecord = {
-  id: string;
-  date: string;
-  country: string;
-  recipientName: string;
-  walletType: string;
-  amount: string;
-  status: "pending" | "confirmed" | "processing" | "completed" | "cancelled";
-  fee: number;
-  payout: number;
-};
-
-const STORAGE_KEY = "swiftmint-transfers";
-
-function loadTransfers(): TransferRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as TransferRecord[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveTransfers(records: TransferRecord[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch {}
-}
-
-function generateId(): string {
-  return `SM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-}
+const PER_PAGE = 10;
 
 function formatCurrency(n: number): string {
   return `MK ${n.toLocaleString("en-MW")}`;
@@ -67,10 +45,7 @@ function formatDate(iso: string): string {
   });
 }
 
-const statusConfig: Record<
-  TransferRecord["status"],
-  { label: string; icon: React.ElementType; className: string }
-> = {
+const statusConfig: Record<string, { label: string; icon: React.ElementType; className: string }> = {
   pending: { label: "Pending", icon: Clock3, className: "badge-pending" },
   confirmed: { label: "Confirmed", icon: CheckCircle2, className: "badge-confirmed" },
   processing: { label: "Processing", icon: Loader2, className: "badge-processing" },
@@ -78,104 +53,256 @@ const statusConfig: Record<
   cancelled: { label: "Cancelled", icon: XCircle, className: "badge-cancelled" },
 };
 
+const statusFlow = ["pending", "confirmed", "processing", "completed"] as const;
+
+function StatusTimeline({ status }: { status: string }) {
+  if (status === "cancelled") {
+    return (
+      <div className="dash-timeline-cancelled">
+        <XCircle size={14} />
+        <span>Cancelled</span>
+      </div>
+    );
+  }
+  const currentIdx = statusFlow.indexOf(status as typeof statusFlow[number]);
+  if (currentIdx < 0) return null;
+  return (
+    <div className="dash-timeline">
+      {statusFlow.map((s, i) => {
+        const done = i <= currentIdx;
+        const now = i === currentIdx;
+        return (
+          <div key={s} className={`dash-timeline-step ${done ? "done" : ""} ${now ? "now" : ""}`}>
+            <div className="dash-timeline-dot" />
+            <span className="dash-timeline-label">{statusConfig[s].label}</span>
+            {i < statusFlow.length - 1 ? <div className="dash-timeline-line" /> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DetailModal({
+  txn,
+  onClose,
+  onUpdateStatus,
+  onRemove,
+}: {
+  txn: TransactionData;
+  onClose: () => void;
+  onUpdateStatus: (id: string, status: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const StatusIcon = statusConfig[txn.status]?.icon || Clock3;
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" type="button" onClick={onClose}><X size={20} /></button>
+        <strong className="auth-form-title">Transaction details</strong>
+
+        <div className="dash-detail-grid">
+          <div className="dash-detail-field">
+            <span>Reference</span>
+            <strong>{txn.reference}</strong>
+          </div>
+          <div className="dash-detail-field">
+            <span>Type</span>
+            <strong className="dash-type">{txn.type}</strong>
+          </div>
+          <div className="dash-detail-field">
+            <span>Status</span>
+            <span className={`dash-badge ${statusConfig[txn.status]?.className || "badge-pending"}`}>
+              <StatusIcon size={13} />
+              {statusConfig[txn.status]?.label || txn.status}
+            </span>
+          </div>
+          <div className="dash-detail-field">
+            <span>Amount</span>
+            <strong>{formatCurrency(txn.amount)}</strong>
+          </div>
+          <div className="dash-detail-field">
+            <span>Fee</span>
+            <strong>{formatCurrency(txn.fee)}</strong>
+          </div>
+          <div className="dash-detail-field">
+            <span>Total charged</span>
+            <strong>{formatCurrency(txn.amount + txn.fee)}</strong>
+          </div>
+          <div className="dash-detail-field">
+            <span>Payout</span>
+            <strong>{formatCurrency(txn.payout)}</strong>
+          </div>
+          <div className="dash-detail-field">
+            <span>Date</span>
+            <strong>{formatDate(txn.created_at)}</strong>
+          </div>
+          {txn.country ? (
+            <div className="dash-detail-field">
+              <span>Country</span>
+              <strong>{txn.country}</strong>
+            </div>
+          ) : null}
+          {txn.recipient_name ? (
+            <div className="dash-detail-field">
+              <span>Recipient</span>
+              <strong>{txn.recipient_name}</strong>
+            </div>
+          ) : null}
+          {txn.wallet_type ? (
+            <div className="dash-detail-field">
+              <span>Wallet</span>
+              <strong>{txn.wallet_type}</strong>
+            </div>
+          ) : null}
+          {txn.recipient_number ? (
+            <div className="dash-detail-field">
+              <span>Mobile</span>
+              <strong>{txn.recipient_number}</strong>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="dash-detail-desc">
+          <span>Description</span>
+          <p>{txn.description}</p>
+        </div>
+
+        <StatusTimeline status={txn.status} />
+
+        <div className="dash-detail-actions">
+          {txn.status === "pending" ? (
+            <>
+              <button className="button button-primary" type="button" onClick={() => { onUpdateStatus(txn.id, "confirmed"); onClose(); }}>
+                Confirm transaction
+              </button>
+              <button className="button button-secondary dash-action-danger" type="button" onClick={() => { onUpdateStatus(txn.id, "cancelled"); onClose(); }}>
+                Cancel
+              </button>
+            </>
+          ) : null}
+          {txn.status === "confirmed" ? (
+            <button className="button button-primary" type="button" onClick={() => { onUpdateStatus(txn.id, "processing"); onClose(); }}>
+              Mark processing
+            </button>
+          ) : null}
+          {txn.status === "processing" ? (
+            <button className="button button-primary" type="button" onClick={() => { onUpdateStatus(txn.id, "completed"); onClose(); }}>
+              Complete transaction
+            </button>
+          ) : null}
+          {(txn.status === "completed" || txn.status === "cancelled") ? (
+            <button className="button button-secondary dash-action-danger" type="button" onClick={() => { onRemove(txn.id); onClose(); }}>
+              Remove
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DashboardClient() {
-  const [transfers, setTransfers] = useState<TransferRecord[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    country: "Kenya",
-    recipientName: "",
-    walletType: "M-Pesa",
-    amount: "",
-  });
+  const { user, token, balance, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const [allTransactions, setAllTransactions] = useState<TransactionData[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [fetching, setFetching] = useState(true);
+
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | string>("all");
+  const [page, setPage] = useState(1);
+  const [detailTxn, setDetailTxn] = useState<TransactionData | null>(null);
+
+  const fetchTransactions = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await apiGetTransactions(token);
+      setAllTransactions(data.transactions);
+    } catch {
+      // ignore
+    } finally {
+      setFetching(false);
+    }
+  }, [token]);
 
   useEffect(() => {
-    setTransfers(loadTransfers());
-    setLoaded(true);
-  }, []);
+    if (!authLoading && !user) { router.push("/login"); return; }
+    if (user && token) {
+      fetchTransactions();
+      setLoaded(true);
+    }
+  }, [user, token, authLoading, router, fetchTransactions]);
 
-  const selectedCountry = countries.find((c) => c.name === form.country);
-  const selectedWallets = selectedCountry?.wallets ?? [];
-  const sortedTransfers = [...transfers].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-  );
+  const filtered = useMemo(() => {
+    let list = allTransactions;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((t) =>
+        t.reference.toLowerCase().includes(q) ||
+        t.description.toLowerCase().includes(q) ||
+        (t.recipient_name && t.recipient_name.toLowerCase().includes(q))
+      );
+    }
+    if (typeFilter !== "all") list = list.filter((t) => t.type === typeFilter);
+    if (statusFilter !== "all") list = list.filter((t) => t.status === statusFilter);
+    return list;
+  }, [allTransactions, search, typeFilter, statusFilter]);
 
-  const totalSent = transfers
-    .filter((t) => t.status !== "cancelled")
-    .reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const safePage = Math.min(page, totalPages);
+  const paginated = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
-  const totalFees = transfers
+  useEffect(() => { setPage(1); }, [search, typeFilter, statusFilter]);
+
+  const totalSent = allTransactions
+    .filter((t) => t.type === "send" && t.status !== "cancelled")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalFees = allTransactions
     .filter((t) => t.status !== "cancelled")
     .reduce((sum, t) => sum + t.fee, 0);
 
-  const completedCount = transfers.filter((t) => t.status === "completed").length;
-  const pendingCount = transfers.filter((t) => t.status === "pending" || t.status === "processing").length;
+  const completedCount = allTransactions.filter((t) => t.status === "completed").length;
+  const pendingCount = allTransactions.filter((t) => t.status === "pending" || t.status === "processing").length;
 
-  function addTransfer(record: TransferRecord) {
-    const updated = [...transfers, record];
-    setTransfers(updated);
-    saveTransfers(updated);
+  async function handleUpdateStatus(id: string, status: string) {
+    if (!token) return;
+    try {
+      await apiUpdateTransactionStatus(token, id, status);
+      await fetchTransactions();
+    } catch {
+      // ignore
+    }
   }
 
-  function updateStatus(id: string, status: TransferRecord["status"]) {
-    const updated = transfers.map((t) => (t.id === id ? { ...t, status } : t));
-    setTransfers(updated);
-    saveTransfers(updated);
-  }
-
-  function removeTransfer(id: string) {
-    const updated = transfers.filter((t) => t.id !== id);
-    setTransfers(updated);
-    saveTransfers(updated);
-  }
-
-  function handleAddTransfer(e: React.FormEvent) {
-    e.preventDefault();
-
-    const numAmount = Number(form.amount);
-    if (!numAmount || numAmount <= 0) return;
-
-    const STANDARD_RATE = 0.06;
-    const VIP_RATE = 0.035;
-    const MIN_FEE = 5000;
-    const VIP_THRESHOLD = 300000;
-
-    const isVip = numAmount >= VIP_THRESHOLD;
-    const rawFee = numAmount * (isVip ? VIP_RATE : STANDARD_RATE);
-    const fee = Math.max(rawFee, MIN_FEE);
-
-    addTransfer({
-      id: generateId(),
-      date: new Date().toISOString(),
-      country: form.country,
-      recipientName: form.recipientName || "Unnamed",
-      walletType: form.walletType,
-      amount: String(numAmount),
-      status: "pending",
-      fee: Math.round(fee),
-      payout: Math.round(numAmount - fee),
-    });
-
-    setForm({ country: "Kenya", recipientName: "", walletType: "M-Pesa", amount: "" });
-    setShowForm(false);
+  async function handleRemove(id: string) {
+    if (!token) return;
+    try {
+      await apiDeleteTransaction(token, id);
+      await fetchTransactions();
+    } catch {
+      // ignore
+    }
   }
 
   function exportCSV() {
-    const headers = ["ID", "Date", "Country", "Recipient", "Wallet", "Amount (MWK)", "Fee (MWK)", "Payout (MWK)", "Status"];
-    const rows = sortedTransfers.map((t) =>
-      [t.id, t.date, t.country, t.recipientName, t.walletType, t.amount, t.fee, t.payout, t.status].join(","),
+    const headers = ["ID", "Reference", "Date", "Type", "Description", "Amount (MWK)", "Fee (MWK)", "Payout (MWK)", "Status", "Country", "Recipient", "Wallet", "Number"];
+    const rows = filtered.map((t) =>
+      [t.id, t.reference, t.created_at, t.type, `"${t.description}"`, t.amount, t.fee, t.payout, t.status, t.country || "", t.recipient_name || "", t.wallet_type || "", t.recipient_number || ""].join(","),
     );
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `swiftmint-transfers-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `swiftmint-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  if (!loaded) {
+  if (!loaded || fetching) {
     return (
       <main>
         <section className="page-hero">
@@ -191,240 +318,255 @@ export function DashboardClient() {
     );
   }
 
+  const typeOptions = [
+    { value: "all", label: "All" },
+    { value: "send", label: "Send" },
+    { value: "fund", label: "Fund" },
+    { value: "bill", label: "Bill" },
+  ];
+
+  const statusOptions = [
+    { value: "all", label: "All" },
+    { value: "pending", label: "Pending" },
+    { value: "processing", label: "Processing" },
+    { value: "completed", label: "Completed" },
+    { value: "cancelled", label: "Cancelled" },
+  ];
+
   return (
     <main>
       <section className="page-hero">
         <div className="page-hero-inner">
           <p className="eyebrow">Dashboard</p>
-          <h1>Your transfer history</h1>
+          <h1>Your SwiftMint account</h1>
           <p>
-            Track all your SwiftMint transfer requests, payment status, and income records
-            in one place.
+            Welcome back, {user?.name}. Check your balance, view transactions,
+            and manage your transfers.
           </p>
         </div>
       </section>
 
       <section className="section" aria-label="Dashboard summary">
         <div className="dash-stats">
+          <div className="dash-stat-card dash-balance-card">
+            <span className="stat-icon"><Wallet size={22} /></span>
+            <strong className="stat-value">{formatCurrency(balance)}</strong>
+            <span className="stat-label">Wallet balance</span>
+          </div>
           <div className="dash-stat-card">
-            <span className="stat-icon">
-              <TrendingUp size={22} aria-hidden="true" />
-            </span>
+            <span className="stat-icon"><TrendingUp size={22} /></span>
             <strong className="stat-value">{formatCurrency(totalSent)}</strong>
             <span className="stat-label">Total sent</span>
           </div>
           <div className="dash-stat-card">
-            <span className="stat-icon">
-              <Wallet size={22} aria-hidden="true" />
-            </span>
+            <span className="stat-icon"><Banknote size={22} /></span>
             <strong className="stat-value">{formatCurrency(totalFees)}</strong>
             <span className="stat-label">Total fees paid</span>
           </div>
           <div className="dash-stat-card">
-            <span className="stat-icon">
-              <CheckCircle2 size={22} aria-hidden="true" />
-            </span>
+            <span className="stat-icon"><CheckCircle2 size={22} /></span>
             <strong className="stat-value">{completedCount}</strong>
             <span className="stat-label">Completed</span>
           </div>
           <div className="dash-stat-card">
-            <span className="stat-icon">
-              <Clock3 size={22} aria-hidden="true" />
-            </span>
+            <span className="stat-icon"><Clock3 size={22} /></span>
             <strong className="stat-value">{pendingCount}</strong>
             <span className="stat-label">Active</span>
           </div>
         </div>
 
         <div className="dash-actions">
-          <button className="button button-primary" type="button" onClick={() => setShowForm(!showForm)}>
-            {showForm ? "Cancel" : "Record a transfer"}
-          </button>
-          {transfers.length > 0 ? (
+          <Link className="button button-primary" href="/transfer">
+            <ArrowRight size={17} />
+            Send money
+          </Link>
+          <Link className="button button-secondary" href="/wallet">
+            <Wallet size={17} />
+            Fund wallet
+          </Link>
+          <Link className="button button-secondary" href="/pay">
+            <Banknote size={17} />
+            Pay bills
+          </Link>
+          {filtered.length > 0 ? (
             <button className="button button-secondary" type="button" onClick={exportCSV}>
-              <Download size={17} aria-hidden="true" />
+              <Download size={17} />
               Export CSV
             </button>
           ) : null}
-          <Link className="button button-secondary" href="/pay">
-            <Banknote size={17} aria-hidden="true" />
-            Make a payment
-          </Link>
         </div>
 
-        {showForm ? (
-          <form className="dash-form" onSubmit={handleAddTransfer}>
-            <strong>Record a transfer request</strong>
-            <div className="dash-form-grid">
-              <label>
-                <span>Country</span>
-                <select
-                  value={form.country}
-                  onChange={(e) => {
-                    const next = countries.find((c) => c.name === e.target.value);
-                    setForm({
-                      ...form,
-                      country: e.target.value,
-                      walletType: next?.wallets[0] ?? form.walletType,
-                    });
-                  }}
-                >
-                  {countries.map((c) => (
-                    <option key={c.slug} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Wallet</span>
-                <select
-                  value={form.walletType}
-                  onChange={(e) => setForm({ ...form, walletType: e.target.value })}
-                >
-                  {selectedWallets.map((w) => (
-                    <option key={w} value={w}>{w}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Recipient name</span>
-                <input
-                  type="text"
-                  value={form.recipientName}
-                  onChange={(e) => setForm({ ...form, recipientName: e.target.value })}
-                  placeholder="e.g. Grace Mwangi"
-                />
-              </label>
-              <label>
-                <span>Amount (MWK)</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                  placeholder="e.g. 100000"
-                />
-              </label>
-            </div>
-            <button className="button button-primary" type="submit">
-              <Smartphone size={17} aria-hidden="true" />
-              Save transfer record
-            </button>
-          </form>
-        ) : null}
-
-        {sortedTransfers.length === 0 ? (
+        {allTransactions.length === 0 ? (
           <div className="dash-empty">
-            <MessageCircle size={40} aria-hidden="true" />
-            <strong>No transfers recorded yet</strong>
-            <p>Click "Record a transfer" to add your first transfer request.</p>
+            <Wallet size={40} />
+            <strong>No transactions yet</strong>
+            <p>You received MK 20,000 as a welcome bonus. Start by sending money or funding your wallet.</p>
+            <Link className="button button-primary" href="/transfer">Send money now</Link>
           </div>
         ) : (
-          <div className="dash-table-wrap">
-            <table className="dash-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Date</th>
-                  <th>Country</th>
-                  <th>Recipient</th>
-                  <th>Amount</th>
-                  <th>Fee</th>
-                  <th>Status</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {sortedTransfers.map((t) => {
-                  const StatusIcon = statusConfig[t.status].icon;
-                  return (
-                    <tr key={t.id}>
-                      <td className="dash-id">{t.id}</td>
-                      <td>{formatDate(t.date)}</td>
-                      <td>
-                        <span className="dash-country">{t.country}</span>
-                      </td>
-                      <td>{t.recipientName}</td>
-                      <td className="dash-amount">{formatCurrency(Number(t.amount))}</td>
-                      <td className="dash-fee">{formatCurrency(t.fee)}</td>
-                      <td>
-                        <span className={`dash-badge ${statusConfig[t.status].className}`}>
-                          <StatusIcon size={13} aria-hidden="true" />
-                          {statusConfig[t.status].label}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="dash-row-actions">
-                          {t.status === "pending" ? (
-                            <>
-                              <button
-                                className="dash-action-btn"
-                                title="Mark confirmed"
-                                type="button"
-                                onClick={() => updateStatus(t.id, "confirmed")}
-                              >
-                                <CheckCircle2 size={15} />
-                              </button>
-                              <button
-                                className="dash-action-btn dash-action-danger"
-                                title="Cancel"
-                                type="button"
-                                onClick={() => updateStatus(t.id, "cancelled")}
-                              >
-                                <XCircle size={15} />
-                              </button>
-                            </>
-                          ) : null}
-                          {t.status === "confirmed" ? (
-                            <button
-                              className="dash-action-btn"
-                              title="Mark processing"
-                              type="button"
-                              onClick={() => updateStatus(t.id, "processing")}
-                            >
-                              <Loader2 size={15} />
-                            </button>
-                          ) : null}
-                          {t.status === "processing" ? (
-                            <button
-                              className="dash-action-btn"
-                              title="Mark completed"
-                              type="button"
-                              onClick={() => updateStatus(t.id, "completed")}
-                            >
-                              <CheckCircle2 size={15} />
-                            </button>
-                          ) : null}
-                          {t.status === "completed" || t.status === "cancelled" ? (
-                            <button
-                              className="dash-action-btn dash-action-danger"
-                              title="Delete"
-                              type="button"
-                              onClick={() => removeTransfer(t.id)}
-                            >
-                              <XCircle size={15} />
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="dash-controls">
+              <div className="dash-search">
+                <Search size={16} />
+                <input
+                  type="text"
+                  placeholder="Search by reference, description, recipient..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                {search ? (
+                  <button className="dash-search-clear" type="button" onClick={() => setSearch("")}>
+                    <X size={16} />
+                  </button>
+                ) : null}
+              </div>
+              <div className="dash-filters">
+                <Filter size={15} />
+                {typeOptions.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    className={`dash-filter-btn ${typeFilter === o.value ? "active" : ""}`}
+                    onClick={() => setTypeFilter(o.value)}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+                <div className="dash-filter-divider" />
+                {statusOptions.map((o) => (
+                  <button
+                    key={o.value}
+                    type="button"
+                    className={`dash-filter-btn ${statusFilter === o.value ? "active" : ""}`}
+                    onClick={() => setStatusFilter(o.value)}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              <span className="dash-count">{filtered.length} transaction{filtered.length !== 1 ? "s" : ""}</span>
+            </div>
+
+            <div className="dash-table-wrap">
+              <table className="dash-table">
+                <thead>
+                  <tr>
+                    <th>Reference</th>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Fee</th>
+                    <th>Status</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map((t) => {
+                    const cfg = statusConfig[t.status];
+                    const StatusIcon = cfg?.icon || Clock3;
+                    return (
+                      <tr key={t.id} className="dash-row-clickable" onClick={() => setDetailTxn(t)}>
+                        <td className="dash-ref">{t.reference}</td>
+                        <td>{formatDate(t.created_at)}</td>
+                        <td className="dash-type">{t.type}</td>
+                        <td className="dash-desc">{t.description}</td>
+                        <td className="dash-amount">{formatCurrency(t.amount)}</td>
+                        <td className="dash-fee">{formatCurrency(t.fee)}</td>
+                        <td>
+                          <span className={`dash-badge ${cfg?.className || "badge-pending"}`}>
+                            <StatusIcon size={13} />
+                            {cfg?.label || t.status}
+                          </span>
+                        </td>
+                        <td>
+                          <button className="dash-action-btn" title="View details" type="button"
+                            onClick={(e) => { e.stopPropagation(); setDetailTxn(t); }}>
+                            <Search size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="dash-card-list">
+              {paginated.map((t) => {
+                const cfg = statusConfig[t.status];
+                const StatusIcon = cfg?.icon || Clock3;
+                return (
+                  <div key={t.id} className="dash-mobile-card" onClick={() => setDetailTxn(t)}>
+                    <div className="dash-mobile-card-row">
+                      <span className="dash-ref">{t.reference}</span>
+                      <span className={`dash-badge ${cfg?.className || "badge-pending"}`}>
+                        <StatusIcon size={12} />
+                        {cfg?.label || t.status}
+                      </span>
+                    </div>
+                    <div className="dash-mobile-card-row">
+                      <span className="dash-type">{t.type}</span>
+                      <span className="dash-amount">{formatCurrency(t.amount)}</span>
+                    </div>
+                    <div className="dash-mobile-card-row dash-mobile-card-desc">
+                      <span>{t.description}</span>
+                    </div>
+                    <div className="dash-mobile-card-row">
+                      <span className="dash-mobile-card-date">{formatDate(t.created_at)}</span>
+                      <span className="dash-mobile-card-fee">Fee: {formatCurrency(t.fee)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {totalPages > 1 ? (
+              <div className="dash-pagination">
+                <button className="button button-secondary" type="button" disabled={safePage <= 1}
+                  onClick={() => setPage(safePage - 1)}>
+                  <ChevronLeft size={16} />
+                  Previous
+                </button>
+                <div className="dash-pagination-pages">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                    <button key={p} type="button"
+                      className={`dash-page-btn ${p === safePage ? "active" : ""}`}
+                      onClick={() => setPage(p)}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+                <button className="button button-secondary" type="button" disabled={safePage >= totalPages}
+                  onClick={() => setPage(safePage + 1)}>
+                  Next
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            ) : null}
+          </>
         )}
       </section>
 
       <section className="info-band" aria-labelledby="dash-help">
-        <MessageCircle size={26} aria-hidden="true" />
+        <MessageCircle size={26} />
         <div>
-          <h2 id="dash-help">Need help with a transfer?</h2>
+          <h2 id="dash-help">Need help?</h2>
           <p>
-            Contact SwiftMint on WhatsApp at {formattedWhatsappNumber} for status
-            updates or questions about your requests.
+            Contact SwiftMint on WhatsApp at {formattedWhatsappNumber} for
+            assistance with your account or transactions.
           </p>
         </div>
       </section>
+
+      {detailTxn ? (
+        <DetailModal
+          txn={detailTxn}
+          onClose={() => setDetailTxn(null)}
+          onUpdateStatus={handleUpdateStatus}
+          onRemove={handleRemove}
+        />
+      ) : null}
     </main>
   );
 }
