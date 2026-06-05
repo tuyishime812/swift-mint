@@ -199,18 +199,27 @@ export default function Home() {
             <h2 id="why-title">Built for reliable mobile money transfers</h2>
           </div>
           <div className="why-grid">
-            {whyMukuru.map((w) => {
-              const Icon = w.icon;
-              return (
-                <div className="why-card" key={w.title}>
-                  <span className="why-icon">
-                    <Icon size={28} aria-hidden="true" />
-                  </span>
-                  <strong>{w.title}</strong>
-                  <p>{w.text}</p>
-                </div>
-              );
-            })}
+            <div className="why-card">
+              <span className="why-icon"><Users size={28} aria-hidden="true" /></span>
+              <strong>Trusted by customers across Malawi</strong>
+              <p>SwiftMint provides a professional, structured transfer experience for individuals and businesses.</p>
+            </div>
+            <div className="why-card">
+              <span className="why-icon"><Smartphone size={28} aria-hidden="true" /></span>
+              <strong>Quick and easy transfers</strong>
+              <p>Start a transfer on WhatsApp with just a few details. SwiftMint handles the rest.</p>
+            </div>
+            <div className="why-row-split" />
+            <div className="why-card">
+              <span className="why-icon"><Globe2 size={28} aria-hidden="true" /></span>
+              <strong>Over 320,000 payout touchpoints</strong>
+              <p>Through our network of mobile wallet partners, recipients can receive money at thousands of locations across Africa.</p>
+            </div>
+            <div className="why-card">
+              <span className="why-icon"><ShieldCheck size={28} aria-hidden="true" /></span>
+              <strong>International transfers</strong>
+              <p>Send money directly to mobile wallets in {countries.length} countries across Africa and beyond.</p>
+            </div>
           </div>
         </div>
       </section>
