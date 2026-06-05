@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, MessageCircle, User, X } from "lucide-react";
+import { LogOut, Menu, MessageCircle, Moon, ShieldCheck, Sun, User, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/components/ThemeProvider";
 import { getBalance } from "@/lib/store";
 
 const navItems = [
@@ -19,7 +20,8 @@ const navItems = [
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
+  const { theme, toggle: toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [balance, setBalance] = useState(0);
 
@@ -60,9 +62,24 @@ export function SiteHeader() {
               {item.label}
             </Link>
           ))}
+          {isAdmin ? (
+            <Link className={`admin-link ${pathname === "/admin" ? "active" : ""}`} href="/admin">
+              <ShieldCheck size={14} />
+              Admin
+            </Link>
+          ) : null}
         </nav>
 
         <div className="nav-actions">
+          <button
+            className="nav-icon-btn theme-toggle"
+            type="button"
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+
           {user ? (
             <div className="nav-auth">
               <Link className="nav-wallet-btn" href="/wallet">

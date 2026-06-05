@@ -4,6 +4,7 @@ export type User = {
   phone: string;
   email: string;
   password: string;
+  isAdmin?: boolean;
   createdAt: string;
 };
 
@@ -103,6 +104,29 @@ export function findUserByPhone(phone: string): User | undefined {
 
 export function findUserById(id: string): User | undefined {
   return getUsers().find((u) => u.id === id);
+}
+
+const ADMIN_PHONE = "0888888888";
+
+export function seedAdminUser() {
+  const users = getUsers();
+  const existing = users.find((u) => u.isAdmin);
+  if (existing) return;
+  const admin: User = {
+    id: "ADM-001",
+    name: "Admin",
+    phone: ADMIN_PHONE,
+    email: "admin@swiftmint.exchange",
+    password: "Admin@123",
+    isAdmin: true,
+    createdAt: new Date().toISOString(),
+  };
+  users.push(admin);
+  saveUsers(users);
+}
+
+export function isAdminUser(user: User | null): boolean {
+  return user?.isAdmin === true;
 }
 
 export function registerUser(input: {
@@ -308,6 +332,27 @@ export function sendMoney(input: {
   });
 
   return { success: true, transaction: txn };
+}
+
+export function getAllUsers(): User[] {
+  return getUsers();
+}
+
+export function getAllTransactions(): Transaction[] {
+  return getTransactions();
+}
+
+export function updateUser(id: string, updates: Partial<User>) {
+  const users = getUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return;
+  users[idx] = { ...users[idx], ...updates };
+  saveUsers(users);
+}
+
+export function deleteUser(id: string) {
+  const users = getUsers();
+  saveUsers(users.filter((u) => u.id !== id));
 }
 
 export const billers = [

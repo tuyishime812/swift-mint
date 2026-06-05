@@ -6,6 +6,8 @@ import os
 from routes.auth import router as auth_router
 from routes.wallet import router as wallet_router
 from routes.transactions import router as transactions_router
+from routes.admin import router as admin_router
+from routes.admin_settings import router as admin_settings_router
 
 load_dotenv()
 
@@ -25,6 +27,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(wallet_router)
 app.include_router(transactions_router)
+app.include_router(admin_router)
+app.include_router(admin_settings_router)
 
 
 @app.get("/api/health")

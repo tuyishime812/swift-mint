@@ -20,12 +20,13 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import {
+  ShieldCheck,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   type TransactionData,
   apiGetTransactions,
-  apiUpdateTransactionStatus,
-  apiDeleteTransaction,
 } from "@/lib/api";
 import { formattedWhatsappNumber } from "@/lib/swiftmint";
 
@@ -86,13 +87,9 @@ function StatusTimeline({ status }: { status: string }) {
 function DetailModal({
   txn,
   onClose,
-  onUpdateStatus,
-  onRemove,
 }: {
   txn: TransactionData;
   onClose: () => void;
-  onUpdateStatus: (id: string, status: string) => void;
-  onRemove: (id: string) => void;
 }) {
   const StatusIcon = statusConfig[txn.status]?.icon || Clock3;
   return (
@@ -169,41 +166,13 @@ function DetailModal({
         </div>
 
         <StatusTimeline status={txn.status} />
-
-        <div className="dash-detail-actions">
-          {txn.status === "pending" ? (
-            <>
-              <button className="button button-primary" type="button" onClick={() => { onUpdateStatus(txn.id, "confirmed"); onClose(); }}>
-                Confirm transaction
-              </button>
-              <button className="button button-secondary dash-action-danger" type="button" onClick={() => { onUpdateStatus(txn.id, "cancelled"); onClose(); }}>
-                Cancel
-              </button>
-            </>
-          ) : null}
-          {txn.status === "confirmed" ? (
-            <button className="button button-primary" type="button" onClick={() => { onUpdateStatus(txn.id, "processing"); onClose(); }}>
-              Mark processing
-            </button>
-          ) : null}
-          {txn.status === "processing" ? (
-            <button className="button button-primary" type="button" onClick={() => { onUpdateStatus(txn.id, "completed"); onClose(); }}>
-              Complete transaction
-            </button>
-          ) : null}
-          {(txn.status === "completed" || txn.status === "cancelled") ? (
-            <button className="button button-secondary dash-action-danger" type="button" onClick={() => { onRemove(txn.id); onClose(); }}>
-              Remove
-            </button>
-          ) : null}
-        </div>
       </div>
     </div>
   );
 }
 
 export function DashboardClient() {
-  const { user, token, balance, loading: authLoading } = useAuth();
+  const { user, token, balance, loading: authLoading, isAdmin } = useAuth();
   const router = useRouter();
   const [allTransactions, setAllTransactions] = useState<TransactionData[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -266,26 +235,6 @@ export function DashboardClient() {
 
   const completedCount = allTransactions.filter((t) => t.status === "completed").length;
   const pendingCount = allTransactions.filter((t) => t.status === "pending" || t.status === "processing").length;
-
-  async function handleUpdateStatus(id: string, status: string) {
-    if (!token) return;
-    try {
-      await apiUpdateTransactionStatus(token, id, status);
-      await fetchTransactions();
-    } catch {
-      // ignore
-    }
-  }
-
-  async function handleRemove(id: string) {
-    if (!token) return;
-    try {
-      await apiDeleteTransaction(token, id);
-      await fetchTransactions();
-    } catch {
-      // ignore
-    }
-  }
 
   function exportCSV() {
     const headers = ["ID", "Reference", "Date", "Type", "Description", "Amount (MWK)", "Fee (MWK)", "Payout (MWK)", "Status", "Country", "Recipient", "Wallet", "Number"];
@@ -388,6 +337,12 @@ export function DashboardClient() {
             <Banknote size={17} />
             Pay bills
           </Link>
+          {isAdmin ? (
+            <Link className="button admin-link" href="/admin">
+              <ShieldCheck size={17} />
+              Admin
+            </Link>
+          ) : null}
           {filtered.length > 0 ? (
             <button className="button button-secondary" type="button" onClick={exportCSV}>
               <Download size={17} />
@@ -563,8 +518,6 @@ export function DashboardClient() {
         <DetailModal
           txn={detailTxn}
           onClose={() => setDetailTxn(null)}
-          onUpdateStatus={handleUpdateStatus}
-          onRemove={handleRemove}
         />
       ) : null}
     </main>

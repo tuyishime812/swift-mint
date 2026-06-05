@@ -13,12 +13,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import {
-  countries,
-  type TransferRequestInput,
-  walletOptions,
-  formattedWhatsappNumber,
-} from "@/lib/swiftmint";
+import { getSettings, getWalletOptions, type CountrySetting } from "@/lib/settings";
+import { type TransferRequestInput, formattedWhatsappNumber } from "@/lib/swiftmint";
 import { apiSendMoney } from "@/lib/api";
 
 function formatCurrency(n: number): string {
@@ -28,10 +24,14 @@ function formatCurrency(n: number): string {
 export default function TransferPage() {
   const { user, token, balance, loading: authLoading } = useAuth();
   const router = useRouter();
+  const settings = useMemo(() => getSettings(), []);
+  const dynamicCountries = settings.countries;
+  const dynamicWalletOptions = getWalletOptions();
+
   const [form, setForm] = useState<TransferRequestInput>({
-    country: "Kenya",
+    country: dynamicCountries[0]?.name || "Kenya",
     recipientName: "",
-    walletType: "M-Pesa",
+    walletType: dynamicCountries[0]?.wallets[0] || "",
     recipientNumber: "",
     amount: "",
   });
@@ -47,8 +47,8 @@ export default function TransferPage() {
   }, [user, authLoading, router]);
 
   const selectedCountryWallets = useMemo(
-    () => countries.find((c) => c.name === form.country)?.wallets ?? walletOptions,
-    [form.country],
+    () => dynamicCountries.find((c) => c.name === form.country)?.wallets ?? dynamicWalletOptions,
+    [form.country, dynamicCountries, dynamicWalletOptions],
   );
 
   const numAmount = Number(form.amount) || 0;
@@ -62,7 +62,7 @@ export default function TransferPage() {
   function updateField(field: keyof TransferRequestInput, value: string) {
     setForm((current) => {
       if (field === "country") {
-        const next = countries.find((c) => c.name === value);
+        const next = dynamicCountries.find((c) => c.name === value);
         return { ...current, country: value, walletType: next?.wallets[0] ?? current.walletType };
       }
       return { ...current, [field]: value };
@@ -160,7 +160,7 @@ export default function TransferPage() {
                   <label>
                     <span>Destination country</span>
                     <select value={form.country} onChange={(e) => updateField("country", e.target.value)}>
-                      {countries.map((c) => (
+                      {dynamicCountries.map((c) => (
                         <option key={c.slug} value={c.name}>{c.name}</option>
                       ))}
                     </select>

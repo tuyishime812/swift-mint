@@ -8,8 +8,12 @@ CREATE TABLE IF NOT EXISTS users (
   phone TEXT NOT NULL UNIQUE,
   email TEXT NOT NULL,
   password_hash TEXT NOT NULL,
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- To make a user an admin, run in Supabase SQL Editor:
+-- UPDATE users SET is_admin = TRUE WHERE phone = '0888888888';
 
 -- Wallets table
 CREATE TABLE IF NOT EXISTS wallets (

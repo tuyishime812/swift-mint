@@ -1,18 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 const COOKIE_KEY = "swiftmint-cookie-consent";
 
 export function CookieBanner() {
-  const [dismissed, setDismissed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(COOKIE_KEY) === "true";
-  });
+  const [dismissed, setDismissed] = useState(true);
+
+  useEffect(() => {
+    const val = localStorage.getItem(COOKIE_KEY);
+    setDismissed(val === "true");
+  }, []);
 
   function handleAccept() {
     localStorage.setItem(COOKIE_KEY, "true");
+    setDismissed(true);
+  }
+
+  function handleClose() {
     setDismissed(true);
   }
 
@@ -28,7 +34,7 @@ export function CookieBanner() {
         <button className="button button-primary" type="button" onClick={handleAccept}>
           Accept
         </button>
-        <button className="button cookie-dismiss" type="button" onClick={handleAccept} aria-label="Dismiss">
+        <button className="button cookie-dismiss" type="button" onClick={handleClose} aria-label="Dismiss">
           <X size={18} />
         </button>
       </div>

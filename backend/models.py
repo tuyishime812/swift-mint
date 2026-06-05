@@ -37,6 +37,7 @@ class UserResponse(BaseModel):
     name: str
     phone: str
     email: str
+    is_admin: bool = False
     created_at: str
 
 

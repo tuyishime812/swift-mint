@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { AccountNotice } from "@/components/AccountNotice";
 import { CookieBanner } from "@/components/CookieBanner";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
 
@@ -37,14 +39,17 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
-        <AuthProvider>
-          <SiteHeader />
-          <div id="main-content" className="layout-main">
-            {children}
-          </div>
-          <SiteFooter />
-          <CookieBanner />
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <SiteHeader />
+            <div id="main-content" className="layout-main">
+              {children}
+            </div>
+            <SiteFooter />
+            <AccountNotice />
+            <CookieBanner />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

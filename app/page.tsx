@@ -16,6 +16,7 @@ import { CountryCards } from "@/components/CountryCards";
 import { PayoutCalculator } from "@/components/PayoutCalculator";
 import { PricingCards } from "@/components/PricingCards";
 import { TransferForm } from "@/components/TransferForm";
+import { HomeActions } from "@/components/HomeActions";
 import { acceptedPaymentMethods, countries, formattedWhatsappNumber } from "@/lib/swiftmint";
 
 const benefits = [
@@ -131,15 +132,7 @@ export default function Home() {
               Secure outbound mobile payments from Malawi to selected African
               countries, handled through supported mobile money networks.
             </p>
-            <div className="hero-actions" aria-label="SwiftMint primary actions">
-              <Link className="button button-primary" href="/transfer">
-                <MessageCircle size={19} aria-hidden="true" />
-                Send money now
-              </Link>
-              <Link className="button button-secondary" href="/signup">
-                Sign up
-              </Link>
-            </div>
+            <HomeActions />
             <div className="trust-row" aria-label="Service highlights">
               <span>
                 <CheckCircle2 size={17} aria-hidden="true" />

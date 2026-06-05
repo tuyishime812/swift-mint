@@ -54,6 +54,7 @@ def signup(input: UserCreate):
         "phone": input.phone,
         "email": input.email or f"{input.phone}@swiftmint.mw",
         "password_hash": password_hash,
+        "is_admin": False,
         "created_at": datetime.utcnow().isoformat(),
     }).execute()
 
@@ -92,6 +93,7 @@ def signup(input: UserCreate):
             "name": user["name"],
             "phone": user["phone"],
             "email": user["email"],
+            "is_admin": user.get("is_admin", False),
             "created_at": user["created_at"],
         },
         "balance": 20000,
@@ -121,6 +123,7 @@ def login(input: UserLogin):
             "name": user["name"],
             "phone": user["phone"],
             "email": user["email"],
+            "is_admin": user.get("is_admin", False),
             "created_at": user["created_at"],
         },
         "balance": balance,
@@ -137,6 +140,7 @@ def get_me(user: dict = Depends(get_current_user)):
             "name": user["name"],
             "phone": user["phone"],
             "email": user["email"],
+            "is_admin": user.get("is_admin", False),
             "created_at": user["created_at"],
         },
         "balance": balance,

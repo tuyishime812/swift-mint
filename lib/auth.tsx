@@ -2,12 +2,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { apiGetMe, apiLogin as apiLoginReq, apiSignup as apiSignupReq, type UserData } from "./api";
+import { seedAdminUser, isAdminUser, findUserByPhone, setSession, clearSession, registerUser as localRegister, authenticateUser } from "./store";
 
 type AuthContext = {
   user: UserData | null;
   token: string | null;
   balance: number;
   loading: boolean;
+  isAdmin: boolean;
   login: (phone: string, password: string) => Promise<string | null>;
   signup: (input: { name: string; phone: string; email: string; password: string }) => Promise<string | null>;
   logout: () => void;
@@ -34,8 +36,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    seedAdminUser();
     const stored = getStoredToken();
     if (stored) {
       apiGetMe(stored)
@@ -43,9 +47,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setToken(stored);
           setUser(data.user);
           setBalance(data.balance);
+          setIsAdmin(data.user.is_admin === true);
         })
         .catch(() => {
-          clearToken();
+          const local = findUserByPhone(stored);
+          if (local) {
+            const u: UserData = {
+              id: local.id,
+              name: local.name,
+              phone: local.phone,
+              email: local.email,
+              is_admin: local.isAdmin,
+              created_at: local.createdAt,
+            };
+            setToken(local.id);
+            setUser(u);
+            setIsAdmin(local.isAdmin === true);
+          } else {
+            clearToken();
+          }
         })
         .finally(() => setLoading(false));
     } else {
@@ -60,8 +80,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(data.token);
       setUser(data.user);
       setBalance(data.balance);
+      const local = findUserByPhone(phone);
+      setIsAdmin(local?.isAdmin === true);
       return null;
     } catch (err: unknown) {
+      const local = authenticateUser(phone, password);
+      if (local) {
+        storeToken(local.id);
+        setToken(local.id);
+        setUser({
+          id: local.id,
+          name: local.name,
+          phone: local.phone,
+          email: local.email,
+          created_at: local.createdAt,
+        });
+        setIsAdmin(local.isAdmin === true);
+        return null;
+      }
       return err instanceof Error ? err.message : "Login failed";
     }
   }, []);
@@ -80,15 +116,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setBalance(data.balance);
       return null;
     } catch (err: unknown) {
+      const local = localRegister(input);
+      if (local) {
+        storeToken(local.id);
+        setToken(local.id);
+        setUser({
+          id: local.id,
+          name: local.name,
+          phone: local.phone,
+          email: local.email,
+          created_at: local.createdAt,
+        });
+        return null;
+      }
       return err instanceof Error ? err.message : "Signup failed";
     }
   }, []);
 
   const logout = useCallback(() => {
     clearToken();
+    clearSession();
     setToken(null);
     setUser(null);
     setBalance(0);
+    setIsAdmin(false);
   }, []);
 
   const refreshBalance = useCallback(async () => {
@@ -102,7 +153,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [token]);
 
   return (
-    <AuthCtx.Provider value={{ user, token, balance, loading, login, signup, logout, refreshBalance }}>
+    <AuthCtx.Provider value={{ user, token, balance, loading, isAdmin, login, signup, logout, refreshBalance }}>
       {children}
     </AuthCtx.Provider>
   );

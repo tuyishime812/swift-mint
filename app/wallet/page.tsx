@@ -20,7 +20,8 @@ import {
   apiFundWallet,
   apiGetTransactions,
 } from "@/lib/api";
-import { acceptedPaymentMethods, formattedWhatsappNumber } from "@/lib/swiftmint";
+import { getSettings } from "@/lib/settings";
+import { formattedWhatsappNumber } from "@/lib/swiftmint";
 
 function formatCurrency(n: number): string {
   return `MK ${n.toLocaleString("en-MW")}`;
@@ -38,7 +39,7 @@ export default function WalletPage() {
   const [txns, setTxns] = useState<TransactionData[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [fundAmount, setFundAmount] = useState("");
-  const [fundMethod, setFundMethod] = useState(acceptedPaymentMethods[0]);
+  const [fundMethod, setFundMethod] = useState(getSettings().paymentMethods[0]);
   const [funding, setFunding] = useState(false);
   const [fundDone, setFundDone] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -173,7 +174,7 @@ export default function WalletPage() {
                 <label>
                   <span>Payment method</span>
                   <select value={fundMethod} onChange={(e) => setFundMethod(e.target.value)}>
-                    {acceptedPaymentMethods.map((m) => (
+                    {getSettings().paymentMethods.map((m) => (
                       <option key={m} value={m}>{m}</option>
                     ))}
                   </select>

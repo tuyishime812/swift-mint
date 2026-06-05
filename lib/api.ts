@@ -32,6 +32,7 @@ export type UserData = {
   name: string;
   phone: string;
   email: string;
+  is_admin?: boolean;
   created_at: string;
 };
 
@@ -128,6 +129,42 @@ export function apiUpdateTransactionStatus(token: string, txnId: string, status:
 export function apiDeleteTransaction(token: string, txnId: string) {
   return request<{ success: boolean }>(`/api/transactions/${txnId}`, {
     method: "DELETE",
+    token,
+  });
+}
+
+// Admin
+export function apiAdminAllTransactions(token: string) {
+  return request<{ transactions: TransactionData[] }>("/api/admin/transactions", { token });
+}
+
+export function apiAdminAllUsers(token: string) {
+  return request<{ users: UserData[] }>("/api/admin/users", { token });
+}
+
+export function apiAdminUpdateTransactionStatus(token: string, txnId: string, status: string) {
+  return request<{ success: boolean; status: string }>(`/api/admin/transactions/${txnId}/status`, {
+    method: "PATCH",
+    body: { status },
+    token,
+  });
+}
+
+export function apiAdminDeleteTransaction(token: string, txnId: string) {
+  return request<{ success: boolean }>(`/api/admin/transactions/${txnId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export function apiAdminUsersWithBalance(token: string) {
+  return request<{ users: (UserData & { balance: number })[] }>("/api/admin/users-with-balance", { token });
+}
+
+export function apiAdminFundUser(token: string, userId: string, amount: number) {
+  return request<{ success: boolean; new_balance: number; reference: string }>("/api/admin/fund-user", {
+    method: "POST",
+    body: { user_id: userId, amount },
     token,
   });
 }
