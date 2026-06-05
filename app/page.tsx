@@ -16,7 +16,7 @@ import { PayoutCalculator } from "@/components/PayoutCalculator";
 import { PricingCards } from "@/components/PricingCards";
 import { TransferForm } from "@/components/TransferForm";
 import { HomeActions } from "@/components/HomeActions";
-import { acceptedPaymentMethods, formattedWhatsappNumber } from "@/lib/swiftmint";
+import { acceptedPaymentMethods, countries, formattedWhatsappNumber } from "@/lib/swiftmint";
 
 const benefits = [
   {
@@ -33,24 +33,6 @@ const benefits = [
     icon: LockKeyhole,
     title: "Professional handling",
     text: "Each request follows a structured intake flow with clear recipient, wallet, country, and amount details.",
-  },
-];
-
-const stats = [
-  {
-    icon: Globe2,
-    value: "5",
-    label: "Supported countries",
-  },
-  {
-    icon: Smartphone,
-    value: "13",
-    label: "Mobile wallet options",
-  },
-  {
-    icon: Users,
-    value: "100%",
-    label: "WhatsApp-based service",
   },
 ];
 
@@ -72,8 +54,8 @@ const whyMukuru = [
   },
   {
     icon: ShieldCheck,
-    title: "Send directly to mobile wallets",
-    text: "Transfer money directly into recipient mobile wallets in Kenya, Tanzania, Uganda, Zambia, and Ghana.",
+    title: "International transfers",
+    text: `Send money directly to mobile wallets in ${countries.length} countries across Africa and beyond.`,
   },
 ];
 
@@ -102,7 +84,7 @@ const services = [
   {
     icon: Smartphone,
     title: "Send Money",
-    text: "Fast, reliable mobile wallet payouts to over 5 countries across Africa with clear pricing and confirmation before processing.",
+    text: `Fast, reliable mobile wallet payouts to over ${countries.length} countries across Africa with clear pricing and confirmation before processing.`,
     href: "/transfer",
   },
   {
@@ -162,7 +144,11 @@ export default function Home() {
 
       <section className="stats-section" aria-label="SwiftMint by the numbers">
         <div className="stats-grid">
-          {stats.map((stat) => {
+          {[
+            { icon: Globe2, value: String(countries.length), label: "Supported countries" },
+            { icon: Smartphone, value: String(new Set(countries.flatMap(c => c.wallets)).size), label: "Mobile wallet options" },
+            { icon: Users, value: "100%", label: "WhatsApp-based service" },
+          ].map((stat) => {
             const Icon = stat.icon;
             return (
               <div className="stat-card" key={stat.label}>
@@ -183,7 +169,7 @@ export default function Home() {
           <h2 id="service-title">What would you like to do?</h2>
           <p>
             SwiftMint offers a fast, reliable and affordable way to send money home
-            to over 5 countries across Africa with multiple mobile wallet options.
+            to over {countries.length} countries across Africa with multiple mobile wallet options.
           </p>
         </div>
         <div className="services-grid">

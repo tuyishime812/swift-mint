@@ -2359,7 +2359,9 @@ h3 {
   .testimonials-grid,
   .services-grid,
   .locations-grid,
-  .partners-grid {
+  .partners-grid,
+  .why-grid {
+    gap: 24px;
     grid-template-columns: 1fr;
   }
 

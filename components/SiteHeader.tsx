@@ -124,6 +124,18 @@ export function SiteHeader() {
       </div>
 
       <div className={`mobile-panel${menuOpen ? " mobile-panel-open" : ""}`}>
+        <div className="mobile-theme-row">
+          <span>Theme</span>
+          <button
+            className="nav-icon-btn theme-toggle"
+            type="button"
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            <span style={{ marginLeft: "0.5rem" }}>{theme === "dark" ? "Light" : "Dark"}</span>
+          </button>
+        </div>
         <nav className="mobile-nav" aria-label="Mobile navigation">
           {navItems.map((item) => (
             <Link
