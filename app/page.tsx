@@ -12,12 +12,11 @@ import {
   Star,
   Users,
 } from "lucide-react";
-import { CountryCards } from "@/components/CountryCards";
 import { PayoutCalculator } from "@/components/PayoutCalculator";
 import { PricingCards } from "@/components/PricingCards";
 import { TransferForm } from "@/components/TransferForm";
 import { HomeActions } from "@/components/HomeActions";
-import { acceptedPaymentMethods, countries, formattedWhatsappNumber } from "@/lib/swiftmint";
+import { acceptedPaymentMethods, formattedWhatsappNumber } from "@/lib/swiftmint";
 
 const benefits = [
   {
@@ -285,36 +284,6 @@ export default function Home() {
               </blockquote>
             ))}
           </div>
-        </div>
-      </section>
-
-      <section className="countries-band" aria-labelledby="countries-title">
-        <div className="countries-band-inner">
-          <div className="section-heading heading-row">
-            <div>
-              <p className="eyebrow">Supported countries</p>
-              <h2 id="countries-title">Mobile wallet payouts across Africa</h2>
-            </div>
-            <Link className="inline-link" href="/countries">
-              Full country list
-              <ArrowRight size={17} aria-hidden="true" />
-            </Link>
-          </div>
-          <div className="country-flags-row" aria-label="Available countries">
-            {countries.map((c) => (
-              <div className="country-flag-chip" key={c.slug}>
-                <Image
-                  src={`https://flagcdn.com/48x36/${c.code.toLowerCase()}.png`}
-                  alt=""
-                  width={20}
-                  height={15}
-                  className="chip-flag"
-                />
-                {c.name}
-              </div>
-            ))}
-          </div>
-          <CountryCards />
         </div>
       </section>
 

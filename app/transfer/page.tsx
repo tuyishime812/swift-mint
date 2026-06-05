@@ -6,15 +6,14 @@ import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle2,
-  Globe2,
   Loader2,
   MessageCircle,
   RefreshCw,
-  Wallet,
+  Smartphone,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { getSettings, getWalletOptions, type CountrySetting } from "@/lib/settings";
-import { type TransferRequestInput, formattedWhatsappNumber } from "@/lib/swiftmint";
+import { getSettings, type CountrySetting } from "@/lib/settings";
+import { type TransferRequestInput, whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 import { apiSendMoney } from "@/lib/api";
 
 function formatCurrency(n: number): string {
@@ -22,11 +21,11 @@ function formatCurrency(n: number): string {
 }
 
 export default function TransferPage() {
-  const { user, token, balance, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading } = useAuth();
   const router = useRouter();
   const settings = useMemo(() => getSettings(), []);
   const dynamicCountries = settings.countries;
-  const dynamicWalletOptions = getWalletOptions();
+  const paymentMethods = settings.paymentMethods;
 
   const [form, setForm] = useState<TransferRequestInput>({
     country: dynamicCountries[0]?.name || "Kenya",
@@ -47,8 +46,8 @@ export default function TransferPage() {
   }, [user, authLoading, router]);
 
   const selectedCountryWallets = useMemo(
-    () => dynamicCountries.find((c) => c.name === form.country)?.wallets ?? dynamicWalletOptions,
-    [form.country, dynamicCountries, dynamicWalletOptions],
+    () => dynamicCountries.find((c) => c.name === form.country)?.wallets ?? [],
+    [form.country, dynamicCountries],
   );
 
   const numAmount = Number(form.amount) || 0;
@@ -57,7 +56,6 @@ export default function TransferPage() {
   const rawFee = numAmount * rate;
   const fee = Math.max(Math.round(rawFee), 5000);
   const total = numAmount + fee;
-  const hasBalance = balance >= total;
 
   function updateField(field: keyof TransferRequestInput, value: string) {
     setForm((current) => {
@@ -70,12 +68,25 @@ export default function TransferPage() {
     setError("");
   }
 
+  function buildWhatsAppMessage(): string {
+    return [
+      "Hello SwiftMint Exchange, I would like to place a transfer order.",
+      "",
+      `Country: ${form.country}`,
+      `Recipient name: ${form.recipientName}`,
+      `Wallet type: ${form.walletType}`,
+      `Recipient number: ${form.recipientNumber}`,
+      `Amount in MWK: ${form.amount}`,
+      `Fee: ${formatCurrency(fee)}`,
+      `Total to send to your number: ${formatCurrency(total)}`,
+    ].join("\n");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
     if (!numAmount || numAmount <= 0) { setError("Enter a valid MWK amount."); return; }
-    if (!hasBalance) { setError(`Insufficient balance. You need ${formatCurrency(total)} but have ${formatCurrency(balance)}.`); return; }
     if (!form.recipientName.trim()) { setError("Enter the recipient full name."); return; }
     if (!form.recipientNumber.trim()) { setError("Enter the recipient mobile number."); return; }
     if (!token) { setError("Not authenticated."); return; }
@@ -92,21 +103,23 @@ export default function TransferPage() {
       setResult({ reference: data.reference, amount: data.amount, fee: data.fee, total: data.total });
       setSuccess(true);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Transaction failed.");
+      setError(err instanceof Error ? err.message : "Order submission failed.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(buildWhatsAppMessage())}`;
+
   return (
     <main>
       <section className="page-hero">
         <div className="page-hero-inner">
-          <p className="eyebrow">Send money</p>
+          <p className="eyebrow">Place an order</p>
           <h1>Send mobile wallet payouts</h1>
           <p>
-            Transfer money directly to mobile wallets in Kenya, Tanzania, Uganda,
-            Zambia, and Ghana.
+            Send money to our payment number, then submit your order. We confirm
+            receipt and process the payout to your recipient.
           </p>
         </div>
       </section>
@@ -117,10 +130,10 @@ export default function TransferPage() {
             {success && result ? (
               <div className="auth-success">
                 <CheckCircle2 size={48} />
-                <h2>Transfer submitted!</h2>
+                <h2>Order placed!</h2>
                 <p>
-                  Your transfer of {formatCurrency(result.amount)} to {form.recipientName} in {form.country}
-                  has been submitted and is being processed.
+                  Your order of {formatCurrency(result.amount)} to {form.recipientName} in {form.country}
+                  has been submitted and is pending confirmation.
                 </p>
                 <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
                   Reference: {result.reference}
@@ -128,32 +141,41 @@ export default function TransferPage() {
                 <div className="transfer-breakdown">
                   <div><span>Amount</span><strong>{formatCurrency(result.amount)}</strong></div>
                   <div><span>Fee</span><strong>{formatCurrency(result.fee)}</strong></div>
-                  <div><span>Total charged</span><strong>{formatCurrency(result.total)}</strong></div>
+                  <div><span>Total to pay</span><strong>{formatCurrency(result.total)}</strong></div>
                 </div>
                 <div className="transfer-success-actions">
                   <Link className="button button-primary" href="/dashboard">
                     Go to Dashboard
                     <ArrowRight size={18} />
                   </Link>
+                  <a className="button button-secondary" href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                    <MessageCircle size={16} />
+                    Notify on WhatsApp
+                  </a>
                   <button className="button button-secondary" type="button" onClick={() => {
                     setSuccess(false);
                     setResult(null);
                     setForm({ country: "Kenya", recipientName: "", walletType: "M-Pesa", recipientNumber: "", amount: "" });
                   }}>
                     <RefreshCw size={16} />
-                    Send another
+                    Place another
                   </button>
                 </div>
               </div>
             ) : (
               <form className="transfer-form-compact" onSubmit={handleSubmit}>
-                <strong className="auth-form-title">Send money</strong>
+                <strong className="auth-form-title">Place a transfer order</strong>
 
                 {error ? <div className="form-error">{error}</div> : null}
 
-                <div className="wallet-balance-hint">
-                  <Wallet size={16} />
-                  <span>Balance: {formatCurrency(balance)}</span>
+                <div className="transfer-payment-instructions" style={{ background: "var(--surface)", padding: "0.75rem 1rem", borderRadius: "var(--radius)", marginBottom: "1rem", fontSize: "0.85rem" }}>
+                  <strong>Step 1: Send money to our number</strong>
+                  {paymentMethods.map((m) => (
+                    <div key={m} style={{ marginTop: "0.25rem" }}>{m}: <strong>{formattedWhatsappNumber}</strong></div>
+                  ))}
+                  <div style={{ marginTop: "0.5rem", borderTop: "1px solid var(--border)", paddingTop: "0.5rem" }}>
+                    <strong>Step 2: Fill in the order details below</strong>
+                  </div>
                 </div>
 
                 <div className="form-grid">
@@ -212,50 +234,40 @@ export default function TransferPage() {
                       <strong>{formatCurrency(fee)}</strong>
                     </div>
                     <div className="transfer-fee-row">
-                      <span>Total to charge</span>
+                      <span>Total to send to our number</span>
                       <strong>{formatCurrency(total)}</strong>
                     </div>
-                    {!hasBalance ? (
-                      <div className="transfer-insufficient">
-                        Insufficient balance. <Link href="/wallet">Fund your wallet</Link>
-                      </div>
-                    ) : null}
                   </div>
                 ) : null}
 
-                <button className="button button-primary form-submit" type="submit" disabled={isSubmitting || !hasBalance}>
+                <button className="button button-primary form-submit" type="submit" disabled={isSubmitting}>
                   {isSubmitting ? (
                     <Loader2 className="spin" size={19} />
                   ) : (
-                    <Globe2 size={19} />
+                    <Smartphone size={19} />
                   )}
-                  {isSubmitting ? "Processing..." : "Send money"}
+                  {isSubmitting ? "Submitting..." : "Place order"}
                   <ArrowRight size={18} />
                 </button>
+
+                <div style={{ textAlign: "center", marginTop: "0.75rem" }}>
+                  <a className="inline-link" href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                    <MessageCircle size={16} />
+                    Or place this order on WhatsApp instead
+                  </a>
+                </div>
               </form>
             )}
           </div>
 
           <aside className="auth-sidebar">
-            <strong className="auth-sidebar-title">Transfer summary</strong>
-            <div className="sidebar-info-cards">
-              <div className="sidebar-info-card">
-                <span>Standard fee</span>
-                <strong>6%</strong>
-              </div>
-              <div className="sidebar-info-card">
-                <span>VIP fee (MK 300K+)</span>
-                <strong>3.5%</strong>
-              </div>
-              <div className="sidebar-info-card">
-                <span>Minimum fee</span>
-                <strong>MK 5,000</strong>
-              </div>
-            </div>
-            <p className="auth-sidebar-text">
-              Fees are deducted from the total amount. SwiftMint confirms the
-              expected payout before processing.
-            </p>
+            <strong className="auth-sidebar-title">How it works</strong>
+            <ol className="wallet-fund-steps">
+              <li>Send money to our number via {paymentMethods.join(", ")}.</li>
+              <li>Fill in the recipient and payout details on this form.</li>
+              <li>Submit your order — we confirm receipt and process the payout.</li>
+              <li>Track your order status on the dashboard.</li>
+            </ol>
             <div className="request-note">
               <MessageCircle size={20} />
               <span>WhatsApp: {formattedWhatsappNumber}</span>

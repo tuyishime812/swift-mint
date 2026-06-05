@@ -5,18 +5,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
-  Banknote,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock3,
   Download,
+  ExternalLink,
   Filter,
   Loader2,
   MessageCircle,
   Search,
+  Smartphone,
   TrendingUp,
-  Wallet,
   X,
   XCircle,
 } from "lucide-react";
@@ -28,7 +28,8 @@ import {
   type TransactionData,
   apiGetTransactions,
 } from "@/lib/api";
-import { formattedWhatsappNumber } from "@/lib/swiftmint";
+import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
+import { getSettings } from "@/lib/settings";
 
 const PER_PAGE = 10;
 
@@ -289,54 +290,44 @@ export function DashboardClient() {
           <p className="eyebrow">Dashboard</p>
           <h1>Your SwiftMint account</h1>
           <p>
-            Welcome back, {user?.name}. Check your balance, view transactions,
-            and manage your transfers.
+            Welcome back, {user?.name}. Place transfer orders, track their
+            status, and manage your payouts.
           </p>
         </div>
       </section>
 
       <section className="section" aria-label="Dashboard summary">
         <div className="dash-stats">
-          <div className="dash-stat-card dash-balance-card">
-            <span className="stat-icon"><Wallet size={22} /></span>
-            <strong className="stat-value">{formatCurrency(balance)}</strong>
-            <span className="stat-label">Wallet balance</span>
-          </div>
           <div className="dash-stat-card">
             <span className="stat-icon"><TrendingUp size={22} /></span>
-            <strong className="stat-value">{formatCurrency(totalSent)}</strong>
-            <span className="stat-label">Total sent</span>
-          </div>
-          <div className="dash-stat-card">
-            <span className="stat-icon"><Banknote size={22} /></span>
-            <strong className="stat-value">{formatCurrency(totalFees)}</strong>
-            <span className="stat-label">Total fees paid</span>
+            <strong className="stat-value">{allTransactions.length}</strong>
+            <span className="stat-label">Total orders</span>
           </div>
           <div className="dash-stat-card">
             <span className="stat-icon"><CheckCircle2 size={22} /></span>
             <strong className="stat-value">{completedCount}</strong>
-            <span className="stat-label">Completed</span>
+            <span className="stat-label">Completed payouts</span>
           </div>
           <div className="dash-stat-card">
             <span className="stat-icon"><Clock3 size={22} /></span>
             <strong className="stat-value">{pendingCount}</strong>
-            <span className="stat-label">Active</span>
+            <span className="stat-label">Pending orders</span>
           </div>
         </div>
 
         <div className="dash-actions">
           <Link className="button button-primary" href="/transfer">
             <ArrowRight size={17} />
-            Send money
+            Place an order
           </Link>
-          <Link className="button button-secondary" href="/wallet">
-            <Wallet size={17} />
-            Fund wallet
+          <Link className="button button-secondary" href="/dashboard#payment-info">
+            <Smartphone size={17} />
+            Send to our number
           </Link>
-          <Link className="button button-secondary" href="/pay">
-            <Banknote size={17} />
-            Pay bills
-          </Link>
+          <a className="button button-secondary" href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">
+            <MessageCircle size={17} />
+            Order via WhatsApp
+          </a>
           {isAdmin ? (
             <Link className="button admin-link" href="/admin">
               <ShieldCheck size={17} />
@@ -351,12 +342,26 @@ export function DashboardClient() {
           ) : null}
         </div>
 
+        <div className="dash-payment-info" id="payment-info" style={{ background: "var(--surface)", padding: "1.25rem 1.5rem", borderRadius: "var(--radius)", marginTop: "1.5rem" }}>
+          <strong style={{ display: "block", marginBottom: "0.5rem" }}>How it works:</strong>
+          <ol style={{ margin: 0, paddingLeft: "1.25rem", lineHeight: "1.8" }}>
+            <li>Send the money to one of our payment numbers below.</li>
+            <li>Place an order on this website or via WhatsApp with your payment details.</li>
+            <li>We confirm receipt and process the payout to your recipient.</li>
+          </ol>
+          <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.9rem" }}>
+            {getSettings().paymentMethods.map((m) => (
+              <span key={m}><strong>{m}:</strong> {formattedWhatsappNumber}</span>
+            ))}
+          </div>
+        </div>
+
         {allTransactions.length === 0 ? (
           <div className="dash-empty">
-            <Wallet size={40} />
-            <strong>No transactions yet</strong>
-            <p>You received MK 20,000 as a welcome bonus. Start by sending money or funding your wallet.</p>
-            <Link className="button button-primary" href="/transfer">Send money now</Link>
+            <Smartphone size={40} />
+            <strong>No orders yet</strong>
+            <p>Send money to our payment number, then place an order to start transferring to mobile wallets across Africa.</p>
+            <Link className="button button-primary" href="/transfer">Place your first order</Link>
           </div>
         ) : (
           <>
@@ -506,10 +511,10 @@ export function DashboardClient() {
       <section className="info-band" aria-labelledby="dash-help">
         <MessageCircle size={26} />
         <div>
-          <h2 id="dash-help">Need help?</h2>
+          <h2 id="dash-help">Need help placing an order?</h2>
           <p>
-            Contact SwiftMint on WhatsApp at {formattedWhatsappNumber} for
-            assistance with your account or transactions.
+            Contact SwiftMint on WhatsApp at {formattedWhatsappNumber} to place
+            an order or get assistance with your transfers.
           </p>
         </div>
       </section>

@@ -32,7 +32,7 @@ export default function SignUpPage() {
         <div className="page-hero-inner">
           <p className="eyebrow">Get started</p>
           <h1>Create your SwiftMint account</h1>
-          <p>Send money, pay bills, and manage your transfers — all from one account.</p>
+          <p>Place transfer orders, track payouts, and manage your transfers — all from one account.</p>
         </div>
       </section>
 
@@ -43,7 +43,7 @@ export default function SignUpPage() {
               <div className="auth-success">
                 <CheckCircle2 size={48} />
                 <h2>Account created!</h2>
-                <p>Welcome to SwiftMint Exchange. You received MK 20,000 as a welcome bonus.</p>
+                <p>Welcome to SwiftMint Exchange. Your account is ready &mdash; send money to our payment number and place your first transfer order.</p>
                 <Link className="button button-primary" href="/dashboard">
                   Go to Dashboard
                 </Link>
@@ -99,10 +99,10 @@ export default function SignUpPage() {
           <aside className="auth-sidebar">
             <strong className="auth-sidebar-title">Why join SwiftMint?</strong>
             <ul className="auth-benefits">
-              <li>Get MK 20,000 welcome bonus on signup</li>
-              <li>Send mobile wallet payouts to 5+ African countries</li>
-              <li>Pay bills directly from your wallet</li>
-              <li>Track all your transfers from one dashboard</li>
+              <li>Send money to our number &mdash; we handle the payout</li>
+              <li>Send mobile wallet payouts to 30+ countries</li>
+              <li>Place orders via website or WhatsApp</li>
+              <li>Track all your orders from one dashboard</li>
               <li>Transparent fees confirmed before processing</li>
             </ul>
             <div className="request-note">
