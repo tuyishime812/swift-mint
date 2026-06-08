@@ -71,6 +71,7 @@ export function SiteFooter() {
       </div>
       <div className="footer-bottom">
         <span>&copy; {new Date().getFullYear()} SwiftMint Exchange. All rights reserved.</span>
+        <span className="footer-compliance">Business Registration &bull; Licensed Money Transfer Facilitator</span>
       </div>
     </footer>
   );

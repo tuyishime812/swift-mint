@@ -7,7 +7,7 @@ import { countries } from "@/lib/swiftmint";
 export const metadata: Metadata = {
   title: "Supported Countries",
   description:
-    "SwiftMint supports outbound mobile wallet payout requests from Malawi to Kenya, Tanzania, Uganda, Zambia, and Ghana.",
+    "SwiftMint supports outbound mobile wallet payout requests from Malawi to 37+ countries across Africa, Asia, and Europe.",
 };
 
 export default function CountriesPage() {
@@ -16,7 +16,7 @@ export default function CountriesPage() {
       <PageHero
         eyebrow="Supported countries"
         title="Mobile wallet payout corridors"
-        description="SwiftMint currently supports outbound mobile wallet payout requests from Malawi to Kenya, Tanzania, Uganda, Zambia, and Ghana."
+        description="SwiftMint currently supports outbound mobile wallet payout requests from Malawi to 37+ countries across Africa, Asia, and Europe."
         ctaLabel="Request a transfer"
         ctaHref="/transfer"
       />

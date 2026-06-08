@@ -20,22 +20,24 @@ class TransactionStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class UserCreate(BaseModel):
+class SignupRequest(BaseModel):
     name: str
-    phone: str
     email: str
-    password: str
-
-
-class UserLogin(BaseModel):
     phone: str
+    username: str
+    password: str = Field(min_length=6)
+
+
+class LoginRequest(BaseModel):
+    email_or_username: str
     password: str
 
 
 class UserResponse(BaseModel):
     id: str
     name: str
-    phone: str
+    username: Optional[str] = ""
+    phone: Optional[str] = ""
     email: str
     is_admin: bool = False
     created_at: str

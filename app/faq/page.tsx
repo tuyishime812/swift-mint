@@ -16,7 +16,7 @@ const faqs = [
   },
   {
     q: "What countries can I send money to?",
-    a: "SwiftMint currently supports outbound mobile wallet payouts to Kenya, Tanzania, Uganda, Zambia, and Ghana. More corridors may be added over time.",
+    a: "SwiftMint supports outbound mobile wallet payouts to 37+ countries across Africa, Asia, and Europe. See the full list on our <a href=\"/countries\">supported countries page</a>.",
   },
   {
     q: "Which mobile wallets are supported?",
@@ -61,7 +61,7 @@ export default function FAQPage() {
                 {faq.q}
               </summary>
               <div className="faq-answer">
-                <p>{faq.a}</p>
+                <p dangerouslySetInnerHTML={{ __html: faq.a }} />
               </div>
             </details>
           ))}

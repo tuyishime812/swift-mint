@@ -1,8 +1,10 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { apiGetMe, apiLogin as apiLoginReq, apiSignup as apiSignupReq, type UserData } from "./api";
-import { seedAdminUser, isAdminUser, findUserByPhone, setSession, clearSession, registerUser as localRegister, authenticateUser } from "./store";
+import { useUser, getAccessToken } from "@auth0/nextjs-auth0/client";
+import { apiGetMe, apiLogin, apiSignup, type UserData } from "./api";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type AuthContext = {
   user: UserData | null;
@@ -10,136 +12,117 @@ type AuthContext = {
   balance: number;
   loading: boolean;
   isAdmin: boolean;
-  login: (phone: string, password: string) => Promise<string | null>;
-  signup: (input: { name: string; phone: string; email: string; password: string }) => Promise<string | null>;
+  login: (email_or_username: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, phone: string, username: string, password: string) => Promise<void>;
+  loginWithGoogle: () => void;
+  signupWithGoogle: () => void;
   logout: () => void;
   refreshBalance: () => Promise<void>;
 };
 
 const AuthCtx = createContext<AuthContext | null>(null);
 
+const TOKEN_KEY = "swiftmint_token";
+
 function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("sm-token");
+  return localStorage.getItem(TOKEN_KEY);
 }
 
-function storeToken(token: string) {
-  localStorage.setItem("sm-token", token);
+function storeToken(t: string) {
+  localStorage.setItem(TOKEN_KEY, t);
 }
 
 function clearToken() {
-  localStorage.removeItem("sm-token");
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { user: auth0User, isLoading: auth0Loading } = useUser();
+  const [token, setToken] = useState<string | null>(getStoredToken);
   const [user, setUser] = useState<UserData | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    seedAdminUser();
-    const stored = getStoredToken();
-    if (stored) {
-      apiGetMe(stored)
-        .then((data) => {
-          setToken(stored);
+    if (auth0Loading) return;
+
+    const storedToken = getStoredToken();
+
+    if (storedToken) {
+      let cancelled = false;
+      apiGetMe(storedToken).then((data) => {
+        if (cancelled) return;
+        setToken(storedToken);
+        setUser(data.user);
+        setBalance(data.balance);
+      }).catch(() => {
+        if (cancelled) return;
+        clearToken();
+        setToken(null);
+      }).finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+      return () => { cancelled = true; };
+    }
+
+    if (auth0User) {
+      let cancelled = false;
+      (async () => {
+        try {
+          const auth0AccessToken = await getAccessToken();
+          const res = await fetch(`${API_BASE}/api/auth/auth0`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: auth0AccessToken }),
+          });
+          if (!res.ok) throw new Error("Auth0 exchange failed");
+          const data = await res.json();
+          if (cancelled) return;
+          storeToken(data.token);
+          setToken(data.token);
           setUser(data.user);
-          setBalance(data.balance);
-          setIsAdmin(data.user.is_admin === true);
-        })
-        .catch(() => {
-          const local = findUserByPhone(stored);
-          if (local) {
-            const u: UserData = {
-              id: local.id,
-              name: local.name,
-              phone: local.phone,
-              email: local.email,
-              is_admin: local.isAdmin,
-              created_at: local.createdAt,
-            };
-            setToken(local.id);
-            setUser(u);
-            setIsAdmin(local.isAdmin === true);
-          } else {
-            clearToken();
-          }
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
+          setBalance(data.balance ?? 0);
+        } catch {
+          if (cancelled) return;
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+      return () => { cancelled = true; };
     }
+
+    setLoading(false);
+  }, [auth0User, auth0Loading]);
+
+  const login = useCallback(async (email_or_username: string, password: string) => {
+    const data = await apiLogin({ email_or_username, password });
+    storeToken(data.token);
+    setToken(data.token);
+    setUser(data.user);
   }, []);
 
-  const login = useCallback(async (phone: string, password: string): Promise<string | null> => {
-    try {
-      const data = await apiLoginReq(phone, password);
-      storeToken(data.token);
-      setToken(data.token);
-      setUser(data.user);
-      setBalance(data.balance);
-      const local = findUserByPhone(phone);
-      setIsAdmin(local?.isAdmin === true);
-      return null;
-    } catch (err: unknown) {
-      const local = authenticateUser(phone, password);
-      if (local) {
-        storeToken(local.id);
-        setToken(local.id);
-        setUser({
-          id: local.id,
-          name: local.name,
-          phone: local.phone,
-          email: local.email,
-          created_at: local.createdAt,
-        });
-        setIsAdmin(local.isAdmin === true);
-        return null;
-      }
-      return err instanceof Error ? err.message : "Login failed";
-    }
+  const signup = useCallback(async (name: string, email: string, phone: string, username: string, password: string) => {
+    const data = await apiSignup({ name, email, phone, username, password });
+    storeToken(data.token);
+    setToken(data.token);
+    setUser(data.user);
   }, []);
 
-  const signup = useCallback(async (input: {
-    name: string;
-    phone: string;
-    email: string;
-    password: string;
-  }): Promise<string | null> => {
-    try {
-      const data = await apiSignupReq(input);
-      storeToken(data.token);
-      setToken(data.token);
-      setUser(data.user);
-      setBalance(data.balance);
-      return null;
-    } catch (err: unknown) {
-      const local = localRegister(input);
-      if (local) {
-        storeToken(local.id);
-        setToken(local.id);
-        setUser({
-          id: local.id,
-          name: local.name,
-          phone: local.phone,
-          email: local.email,
-          created_at: local.createdAt,
-        });
-        return null;
-      }
-      return err instanceof Error ? err.message : "Signup failed";
-    }
+  const loginWithGoogle = useCallback(() => {
+    window.location.href = "/auth/login";
+  }, []);
+
+  const signupWithGoogle = useCallback(() => {
+    window.location.href = "/auth/login?screen_hint=signup";
   }, []);
 
   const logout = useCallback(() => {
     clearToken();
-    clearSession();
     setToken(null);
     setUser(null);
     setBalance(0);
-    setIsAdmin(false);
+    window.location.href = "/auth/logout";
   }, []);
 
   const refreshBalance = useCallback(async () => {
@@ -152,8 +135,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [token]);
 
+  const isAdmin = user?.is_admin === true;
+
   return (
-    <AuthCtx.Provider value={{ user, token, balance, loading, isAdmin, login, signup, logout, refreshBalance }}>
+    <AuthCtx.Provider value={{ user, token, balance, loading, isAdmin, login, signup, loginWithGoogle, signupWithGoogle, logout, refreshBalance }}>
       {children}
     </AuthCtx.Provider>
   );

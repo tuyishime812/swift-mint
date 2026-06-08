@@ -67,7 +67,7 @@ export function AdminClient() {
 
   const [tab, setTab] = useState<Tab>("transactions");
   const [allTxns, setAllTxns] = useState<TransactionData[]>([]);
-  const [allUsers, setAllUsers] = useState<({ id: string; name: string; phone: string; email: string; created_at: string } & { balance?: number })[]>([]);
+  const [allUsers, setAllUsers] = useState<({ id: string; name: string; phone?: string; email: string; created_at: string } & { balance?: number })[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   // Filters

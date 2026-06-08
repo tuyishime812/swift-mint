@@ -6,7 +6,7 @@ import { formattedWhatsappNumber } from "@/lib/swiftmint";
 export const metadata: Metadata = {
   title: "About Us",
   description:
-    "SwiftMint Exchange provides premium outbound mobile money facilitation from Malawi to selected African countries.",
+    "SwiftMint Exchange provides premium outbound mobile money facilitation from Malawi to 37+ countries across Africa, Asia, and Europe.",
 };
 
 const values = [
@@ -23,7 +23,7 @@ const values = [
   {
     icon: Globe2,
     title: "Regional Focus",
-    text: "We specialise in African corridors, connecting Malawi to Kenya, Tanzania, Uganda, Zambia, and Ghana through mobile wallet payouts.",
+    text: "We specialise in cross-border corridors across Africa, Asia, and Europe, connecting Malawi to 37+ countries through mobile wallet payouts.",
   },
   {
     icon: Heart,
@@ -68,8 +68,9 @@ export default function AboutPage() {
           <div>
             <strong>Growing the network</strong>
             <p>
-              Starting with five corridors, we continue to evaluate new
-              destinations and wallet options to better serve our customers.
+              Starting with a handful of corridors, we have expanded to 37+
+              countries and continue to evaluate new destinations and wallet
+              options to better serve our customers.
             </p>
           </div>
         </div>

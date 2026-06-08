@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, MessageCircle, Moon, ShieldCheck, Sun, User, X } from "lucide-react";
+import { LogOut, Menu, MessageCircle, Moon, ShieldCheck, Sun, User, X, LogIn } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/components/ThemeProvider";
@@ -95,7 +95,10 @@ export function SiteHeader() {
           ) : (
             <div className="nav-auth">
               <Link className="nav-signup" href="/signup">Sign up</Link>
-              <Link className="nav-login" href="/login">Login</Link>
+              <Link className="nav-login" href="/login">
+                <LogIn size={15} />
+                Login
+              </Link>
             </div>
           )}
 
@@ -158,8 +161,11 @@ export function SiteHeader() {
               </>
             ) : (
               <>
-                <Link className="button button-primary" href="/signup">Sign up</Link>
-                <Link className="button button-secondary" href="/login">Login</Link>
+              <Link className="button button-primary" href="/signup">Sign up</Link>
+              <Link className="button button-secondary" href="/login">
+                <LogIn size={15} />
+                Login
+              </Link>
               </>
             )}
           </div>

@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { AccountNotice } from "@/components/AccountNotice";
 import { CookieBanner } from "@/components/CookieBanner";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { Auth0Provider } from "@auth0/nextjs-auth0/client";
 import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
 
@@ -13,14 +14,14 @@ export const metadata: Metadata = {
     template: "%s | SwiftMint Exchange",
   },
   description:
-    "Premium outbound mobile money facilitation from Malawi to selected African countries. Send mobile wallet payouts to Kenya, Tanzania, Uganda, Zambia, and Ghana.",
+    "Premium outbound mobile money facilitation from Malawi to 37+ countries across Africa, Asia, and Europe. Send mobile wallet payouts worldwide.",
   icons: {
     icon: "/favicon.svg",
   },
   openGraph: {
     title: "SwiftMint Exchange",
     description:
-      "Premium outbound mobile money facilitation from Malawi to selected African countries.",
+      "Premium outbound mobile money facilitation from Malawi to 37+ countries across Africa, Asia, and Europe.",
     url: "https://swiftmint.exchange",
     siteName: "SwiftMint Exchange",
     locale: "en_MW",
@@ -40,15 +41,17 @@ export default function RootLayout({
           Skip to main content
         </a>
         <ThemeProvider>
-          <AuthProvider>
-            <SiteHeader />
-            <div id="main-content" className="layout-main">
-              {children}
-            </div>
-            <SiteFooter />
-            <AccountNotice />
-            <CookieBanner />
-          </AuthProvider>
+          <Auth0Provider>
+            <AuthProvider>
+              <SiteHeader />
+              <div id="main-content" className="layout-main">
+                {children}
+              </div>
+              <SiteFooter />
+              <AccountNotice />
+              <CookieBanner />
+            </AuthProvider>
+          </Auth0Provider>
         </ThemeProvider>
       </body>
     </html>

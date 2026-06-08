@@ -13,8 +13,9 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { getSettings, type CountrySetting } from "@/lib/settings";
-import { type TransferRequestInput, whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
+import { type TransferRequestInput, whatsappNumber, formattedWhatsappNumber, countries } from "@/lib/swiftmint";
 import { apiSendMoney } from "@/lib/api";
+import { fetchFxRates, getFxRate, convertMwK } from "@/lib/fx";
 
 function formatCurrency(n: number): string {
   return `MK ${n.toLocaleString("en-MW")}`;
@@ -37,6 +38,12 @@ export default function TransferPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [fxRates, setFxRates] = useState<Record<string, number> | null>(null);
+  const [fxLoading, setFxLoading] = useState(true);
+
+  useEffect(() => {
+    fetchFxRates().then(setFxRates).catch(() => {}).finally(() => setFxLoading(false));
+  }, []);
   const [result, setResult] = useState<{
     reference: string; amount: number; fee: number; total: number;
   } | null>(null);
@@ -56,6 +63,21 @@ export default function TransferPage() {
   const rawFee = numAmount * rate;
   const fee = Math.max(Math.round(rawFee), 5000);
   const total = numAmount + fee;
+
+  const selectedCountry = useMemo(
+    () => countries.find((c) => c.name === form.country),
+    [form.country],
+  );
+
+  const fxRate = useMemo(
+    () => selectedCountry && fxRates ? getFxRate(fxRates, selectedCountry.currency) : 0,
+    [selectedCountry, fxRates],
+  );
+
+  const localCurrencyPayout = useMemo(
+    () => fxRate > 0 ? convertMwK(numAmount - fee, fxRate) : null,
+    [numAmount, fee, fxRate],
+  );
 
   function updateField(field: keyof TransferRequestInput, value: string) {
     setForm((current) => {
@@ -237,6 +259,17 @@ export default function TransferPage() {
                       <span>Total to send to our number</span>
                       <strong>{formatCurrency(total)}</strong>
                     </div>
+                    {selectedCountry && fxRate > 0 && localCurrencyPayout !== null ? (
+                      <div className="transfer-fee-row">
+                        <span>Est. payout in {selectedCountry.name}</span>
+                        <strong>{localCurrencyPayout.toLocaleString("en-MW", { style: "currency", currency: selectedCountry.currency, minimumFractionDigits: 2 })}</strong>
+                      </div>
+                    ) : fxLoading && selectedCountry ? (
+                      <div className="transfer-fee-row">
+                        <span>Loading exchange rate...</span>
+                        <strong></strong>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
 

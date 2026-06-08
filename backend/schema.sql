@@ -1,19 +1,24 @@
 -- SwiftMint Exchange - Supabase Schema
 -- Run this in the Supabase SQL Editor to create all required tables
+-- Safe to run repeatedly (uses IF NOT EXISTS)
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  phone TEXT NOT NULL UNIQUE,
-  email TEXT NOT NULL,
-  password_hash TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
+  username TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  email TEXT NOT NULL DEFAULT '',
+  password_hash TEXT NOT NULL DEFAULT '',
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- To make a user an admin, run in Supabase SQL Editor:
--- UPDATE users SET is_admin = TRUE WHERE phone = '0888888888';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
+
+-- To make a user an admin, run:
+-- UPDATE users SET is_admin = TRUE WHERE email = 'admin@example.com';
 
 -- Wallets table
 CREATE TABLE IF NOT EXISTS wallets (

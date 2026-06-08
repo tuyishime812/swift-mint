@@ -30,7 +30,8 @@ async function request<T>(path: string, opts: ApiOptions = {}): Promise<T> {
 export type UserData = {
   id: string;
   name: string;
-  phone: string;
+  username?: string;
+  phone?: string;
   email: string;
   is_admin?: boolean;
   created_at: string;
@@ -56,17 +57,17 @@ export type TransactionData = {
 };
 
 // Auth
-export function apiSignup(input: { name: string; phone: string; email: string; password: string }) {
-  return request<{ token: string; user: UserData; balance: number }>("/api/auth/signup", {
+export function apiSignup(input: { name: string; email: string; phone: string; username: string; password: string }) {
+  return request<{ token: string; user: UserData }>("/api/auth/signup", {
     method: "POST",
     body: input,
   });
 }
 
-export function apiLogin(phone: string, password: string) {
-  return request<{ token: string; user: UserData; balance: number }>("/api/auth/login", {
+export function apiLogin(input: { email_or_username: string; password: string }) {
+  return request<{ token: string; user: UserData }>("/api/auth/login", {
     method: "POST",
-    body: { phone, password },
+    body: input,
   });
 }
 

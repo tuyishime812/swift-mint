@@ -4,6 +4,7 @@ from datetime import datetime
 from models import SendMoney, PayBill, TransactionResponse
 from database import supabase
 from routes.auth import get_current_user
+from email import send_order_placed_email, send_transaction_completed_email
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
@@ -74,6 +75,16 @@ def send_money(input: SendMoney, user: dict = Depends(get_current_user)):
         "created_at": datetime.utcnow().isoformat(),
         "updated_at": datetime.utcnow().isoformat(),
     }).execute()
+
+    send_order_placed_email(
+        user_email=user["email"],
+        user_name=user["name"],
+        recipient_name=input.recipient_name,
+        country=input.country,
+        amount=input.amount,
+        fee=fee,
+        reference=ref,
+    )
 
     return {
         "success": True,
@@ -161,6 +172,17 @@ def update_transaction_status(txn_id: str, status: str, user: dict = Depends(get
         "status": status,
         "updated_at": datetime.utcnow().isoformat(),
     }).eq("id", txn_id).execute()
+
+    if status == "completed":
+        txn = result.data[0]
+        send_transaction_completed_email(
+            user_email=user["email"],
+            user_name=user["name"],
+            recipient_name=txn.get("recipient_name", ""),
+            country=txn.get("country", ""),
+            amount=txn["amount"],
+            reference=txn["reference"],
+        )
 
     return {"success": True, "status": status}
 
