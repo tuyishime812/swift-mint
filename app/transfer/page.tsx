@@ -58,8 +58,7 @@ export default function TransferPage() {
   );
 
   const numAmount = Number(form.amount) || 0;
-  const isVip = numAmount >= 300000;
-  const rate = isVip ? 0.035 : 0.06;
+  const rate = 0.03;
   const rawFee = numAmount * rate;
   const fee = Math.max(Math.round(rawFee), 5000);
   const total = numAmount + fee;
@@ -252,7 +251,7 @@ export default function TransferPage() {
                 {numAmount > 0 ? (
                   <div className="transfer-fee-preview">
                     <div className="transfer-fee-row">
-                      <span>Fee ({isVip ? "3.5%" : "6%"})</span>
+                      <span>Fee (3%)</span>
                       <strong>{formatCurrency(fee)}</strong>
                     </div>
                     <div className="transfer-fee-row">

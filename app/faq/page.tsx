@@ -24,7 +24,7 @@ const faqs = [
   },
   {
     q: "How are fees calculated?",
-    a: "Standard requests are charged at 6%. Requests of MK 300,000 and above may qualify for a reduced VIP fee of 3-4%. A minimum fee of MK 5,000 applies to keep small requests viable.",
+    a: "All requests are charged at a flat 3% fee. A minimum fee of MK 5,000 applies to keep small requests viable.",
   },
   {
     q: "When is the payout amount confirmed?",

@@ -57,12 +57,11 @@ const defaultSettings: PlatformSettings = {
     { slug: "sri-lanka", code: "LK", name: "Sri Lanka", wallets: ["mCash", "EzCash", "FriMi"], note: "mCash and EzCash are the leading mobile wallet providers." },
   ],
   pricing: [
-    { label: "Standard fee", value: "6%", description: "Applied to standard outbound transfer requests." },
-    { label: "VIP fee", value: "3-4%", description: "Available for requests from MK 300,000 and above." },
+    { label: "Standard fee", value: "3%", description: "Applied to all outbound transfer requests." },
     { label: "Minimum fee", value: "MK 5,000", description: "Keeps small requests commercially viable and clearly priced." },
   ],
   paymentMethods: ["Airtel Money", "TNM Mpamba", "National Bank Transfer"],
-  feeRates: { standard: 0.06, vip: 0.035, vipThreshold: 300000, minFee: 5000, billFee: 0.02 },
+  feeRates: { standard: 0.03, vip: 0.03, vipThreshold: 300000, minFee: 5000, billFee: 0.02 },
   whatsapp: "+265 882 156 440",
 };
 
