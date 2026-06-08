@@ -64,6 +64,11 @@ def signup(data: SignupRequest):
     if existing_username.data:
         raise HTTPException(status_code=400, detail="Username already taken")
 
+    if data.phone:
+        existing_phone = supabase.table("users").select("id").eq("phone", data.phone).execute()
+        if existing_phone.data:
+            raise HTTPException(status_code=400, detail="Phone number already registered")
+
     now = datetime.utcnow().isoformat()
     hashed = bcrypt.hash(data.password)
 
@@ -96,17 +101,16 @@ def signup(data: SignupRequest):
 
 @router.post("/login")
 def login(data: LoginRequest):
-    result = supabase.table("users").select("*").execute()
-    user = None
-    for u in result.data:
-        if u.get("email") == data.email_or_username or u.get("username") == data.email_or_username:
-            user = u
-            break
+    result = supabase.table("users").select("*").or_(
+        f"email.eq.{data.email_or_username},username.eq.{data.email_or_username}"
+    ).execute()
 
-    if not user:
+    if not result.data:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if not bcrypt.verify(data.password, user["password_hash"]):
+    user = result.data[0]
+
+    if not user.get("password_hash") or not bcrypt.verify(data.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_token(user["id"])

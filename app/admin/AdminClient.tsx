@@ -21,6 +21,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   type TransactionData,
@@ -102,9 +103,8 @@ export function AdminClient() {
   }, [token]);
 
   useEffect(() => {
-    if (!authLoading && (!user || !isAdmin)) { router.push("/dashboard"); return; }
-    if (user && token) fetchData();
-  }, [user, token, authLoading, isAdmin, router, fetchData]);
+    if (user && token && isAdmin) fetchData();
+  }, [user, token, isAdmin, fetchData]);
 
   async function handleUpdateStatus(txnId: string, status: string) {
     if (!token) return;
@@ -197,6 +197,21 @@ export function AdminClient() {
   }), [allTxns]);
 
   useEffect(() => { setPage(1); }, [search, statusFilter]);
+
+  if (!authLoading && (!user || !isAdmin)) {
+    return (
+      <main>
+        <section className="page-hero">
+          <div className="page-hero-inner">
+            <ShieldAlert size={40} style={{ opacity: 0.4, marginBottom: 8 }} />
+            <p className="eyebrow">Restricted</p>
+            <h1>Admin access only</h1>
+            <p>You do not have permission to view this page. Contact your administrator if you need access.</p>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (!loaded) {
     return (
