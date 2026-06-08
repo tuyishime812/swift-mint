@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { useUser, getAccessToken } from "@auth0/nextjs-auth0/client";
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "./firebase";
 import { apiGetMe, apiLogin, apiSignup, type UserData } from "./api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -14,8 +15,8 @@ type AuthContext = {
   isAdmin: boolean;
   login: (email_or_username: string, password: string) => Promise<void>;
   signup: (name: string, email: string, phone: string, username: string, password: string) => Promise<void>;
-  loginWithGoogle: () => void;
-  signupWithGoogle: () => void;
+  loginWithGoogle: () => Promise<void>;
+  signupWithGoogle: () => Promise<void>;
   logout: () => void;
   refreshBalance: () => Promise<void>;
 };
@@ -37,63 +38,49 @@ function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+async function exchangeFirebaseToken(): Promise<{ token: string; user: UserData; balance: number }> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated with Firebase");
+  const idToken = await currentUser.getIdToken();
+  const res = await fetch(`${API_BASE}/api/auth/firebase`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: idToken }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Firebase auth failed");
+  }
+  return res.json();
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { user: auth0User, isLoading: auth0Loading } = useUser();
   const [token, setToken] = useState<string | null>(getStoredToken);
   const [user, setUser] = useState<UserData | null>(null);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (auth0Loading) return;
-
     const storedToken = getStoredToken();
-
-    if (storedToken) {
-      let cancelled = false;
-      apiGetMe(storedToken).then((data) => {
-        if (cancelled) return;
-        setToken(storedToken);
-        setUser(data.user);
-        setBalance(data.balance);
-      }).catch(() => {
-        if (cancelled) return;
-        clearToken();
-        setToken(null);
-      }).finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-      return () => { cancelled = true; };
+    if (!storedToken) {
+      setLoading(false);
+      return;
     }
-
-    if (auth0User) {
-      let cancelled = false;
-      (async () => {
-        try {
-          const auth0AccessToken = await getAccessToken();
-          const res = await fetch(`${API_BASE}/api/auth/auth0`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token: auth0AccessToken }),
-          });
-          if (!res.ok) throw new Error("Auth0 exchange failed");
-          const data = await res.json();
-          if (cancelled) return;
-          storeToken(data.token);
-          setToken(data.token);
-          setUser(data.user);
-          setBalance(data.balance ?? 0);
-        } catch {
-          if (cancelled) return;
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      })();
-      return () => { cancelled = true; };
-    }
-
-    setLoading(false);
-  }, [auth0User, auth0Loading]);
+    let cancelled = false;
+    apiGetMe(storedToken).then((data) => {
+      if (cancelled) return;
+      setToken(storedToken);
+      setUser(data.user);
+      setBalance(data.balance);
+    }).catch(() => {
+      if (cancelled) return;
+      clearToken();
+      setToken(null);
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const login = useCallback(async (email_or_username: string, password: string) => {
     const data = await apiLogin({ email_or_username, password });
@@ -109,12 +96,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   }, []);
 
-  const loginWithGoogle = useCallback(() => {
-    window.location.href = "/auth/login";
+  const loginWithGoogle = useCallback(async () => {
+    await signInWithPopup(auth, googleProvider);
+    const data = await exchangeFirebaseToken();
+    storeToken(data.token);
+    setToken(data.token);
+    setUser(data.user);
+    setBalance(data.balance ?? 0);
   }, []);
 
-  const signupWithGoogle = useCallback(() => {
-    window.location.href = "/auth/login?screen_hint=signup";
+  const signupWithGoogle = useCallback(async () => {
+    await signInWithPopup(auth, googleProvider);
+    const data = await exchangeFirebaseToken();
+    storeToken(data.token);
+    setToken(data.token);
+    setUser(data.user);
+    setBalance(data.balance ?? 0);
   }, []);
 
   const logout = useCallback(() => {
@@ -122,7 +119,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setUser(null);
     setBalance(0);
-    window.location.href = "/auth/logout";
   }, []);
 
   const refreshBalance = useCallback(async () => {

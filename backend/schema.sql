@@ -10,12 +10,14 @@ CREATE TABLE IF NOT EXISTS users (
   phone TEXT NOT NULL DEFAULT '',
   email TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL DEFAULT '',
+  firebase_uid TEXT,
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
 
 -- To make a user an admin, run:
 -- UPDATE users SET is_admin = TRUE WHERE email = 'admin@example.com';

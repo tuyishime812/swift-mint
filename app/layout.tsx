@@ -4,7 +4,6 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { AccountNotice } from "@/components/AccountNotice";
 import { CookieBanner } from "@/components/CookieBanner";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { Auth0Provider } from "@auth0/nextjs-auth0/client";
 import { AuthProvider } from "@/lib/auth";
 import "./globals.css";
 
@@ -41,8 +40,7 @@ export default function RootLayout({
           Skip to main content
         </a>
         <ThemeProvider>
-          <Auth0Provider>
-            <AuthProvider>
+          <AuthProvider>
               <SiteHeader />
               <div id="main-content" className="layout-main">
                 {children}
@@ -50,8 +48,7 @@ export default function RootLayout({
               <SiteFooter />
               <AccountNotice />
               <CookieBanner />
-            </AuthProvider>
-          </Auth0Provider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
