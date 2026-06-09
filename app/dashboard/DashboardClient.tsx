@@ -351,7 +351,7 @@ export function DashboardClient() {
           </ol>
           <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.9rem" }}>
             {getSettings().paymentMethods.map((m) => (
-              <span key={m}><strong>{m}:</strong> {formattedWhatsappNumber}</span>
+              <span key={m}><strong>{m}:</strong> <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">{formattedWhatsappNumber}</a></span>
             ))}
           </div>
         </div>
@@ -513,7 +513,7 @@ export function DashboardClient() {
         <div>
           <h2 id="dash-help">Need help placing an order?</h2>
           <p>
-            Contact SwiftMint on WhatsApp at {formattedWhatsappNumber} to place
+            Contact SwiftMint on WhatsApp at <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">{formattedWhatsappNumber}</a> to place
             an order or get assistance with your transfers.
           </p>
         </div>

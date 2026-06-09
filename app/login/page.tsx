@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Loader2, LogIn, MessageCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { formattedWhatsappNumber } from "@/lib/swiftmint";
+import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 
 export default function LoginPage() {
   const { user, login, loginWithGoogle, loading } = useAuth();
@@ -89,7 +89,7 @@ export default function LoginPage() {
             </p>
             <div className="request-note">
               <MessageCircle size={20} />
-              <span>WhatsApp: {formattedWhatsappNumber}</span>
+              <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">WhatsApp: {formattedWhatsappNumber}</a>
             </div>
           </aside>
         </div>

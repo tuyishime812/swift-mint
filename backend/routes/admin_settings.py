@@ -1,17 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
 
 from database import supabase
 from routes.auth import get_current_user
+from routes.admin_base import require_admin
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-
-def require_admin(user: dict = Depends(get_current_user)):
-    if not user.get("is_admin", False):
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
 
 
 @router.get("/users-with-balance")
@@ -30,12 +24,10 @@ def admin_fund_user(body: dict, admin: dict = Depends(require_admin)):
     user_id = body.get("user_id")
     amount = body.get("amount", 0)
     if not user_id or amount <= 0:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="User ID and positive amount required")
 
     wallet = supabase.table("wallets").select("*").eq("user_id", user_id).execute()
     if not wallet.data:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Wallet not found")
 
     w = wallet.data[0]

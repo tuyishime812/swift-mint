@@ -192,7 +192,7 @@ export default function TransferPage() {
                 <div className="transfer-payment-instructions" style={{ background: "var(--surface)", padding: "0.75rem 1rem", borderRadius: "var(--radius)", marginBottom: "1rem", fontSize: "0.85rem" }}>
                   <strong>Step 1: Send money to our number</strong>
                   {paymentMethods.map((m) => (
-                    <div key={m} style={{ marginTop: "0.25rem" }}>{m}: <strong>{formattedWhatsappNumber}</strong></div>
+                    <div key={m} style={{ marginTop: "0.25rem" }}>{m}: <strong><a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">{formattedWhatsappNumber}</a></strong></div>
                   ))}
                   <div style={{ marginTop: "0.5rem", borderTop: "1px solid var(--border)", paddingTop: "0.5rem" }}>
                     <strong>Step 2: Fill in the order details below</strong>
@@ -302,7 +302,7 @@ export default function TransferPage() {
             </ol>
             <div className="request-note">
               <MessageCircle size={20} />
-              <span>WhatsApp: {formattedWhatsappNumber}</span>
+              <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">WhatsApp: {formattedWhatsappNumber}</a>
             </div>
           </aside>
         </div>

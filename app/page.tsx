@@ -16,7 +16,7 @@ import { PayoutCalculator } from "@/components/PayoutCalculator";
 import { PricingCards } from "@/components/PricingCards";
 import { TransferForm } from "@/components/TransferForm";
 import { HomeActions } from "@/components/HomeActions";
-import { acceptedPaymentMethods, countries, formattedWhatsappNumber } from "@/lib/swiftmint";
+import { acceptedPaymentMethods, countries, whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 
 const benefits = [
   {
@@ -335,7 +335,7 @@ export default function Home() {
           </p>
           <div className="request-note">
             <MessageCircle size={20} aria-hidden="true" />
-            <span>WhatsApp: {formattedWhatsappNumber}</span>
+            <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">WhatsApp: {formattedWhatsappNumber}</a>
           </div>
         </div>
         <TransferForm />

@@ -3,14 +3,9 @@ from datetime import datetime
 
 from database import supabase
 from routes.auth import get_current_user
+from routes.admin_base import require_admin
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
-
-
-def require_admin(user: dict = Depends(get_current_user)):
-    if not user.get("is_admin", False):
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
 
 
 @router.get("/transactions")

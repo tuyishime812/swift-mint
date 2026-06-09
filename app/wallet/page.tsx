@@ -21,7 +21,7 @@ import {
   apiGetTransactions,
 } from "@/lib/api";
 import { getSettings } from "@/lib/settings";
-import { formattedWhatsappNumber } from "@/lib/swiftmint";
+import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 
 function formatCurrency(n: number): string {
   return `MK ${n.toLocaleString("en-MW")}`;
@@ -196,7 +196,7 @@ export default function WalletPage() {
             </ol>
             <div className="request-note">
               <MessageCircle size={20} />
-              <span>WhatsApp: {formattedWhatsappNumber}</span>
+              <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">WhatsApp: {formattedWhatsappNumber}</a>
             </div>
           </aside>
         </div>

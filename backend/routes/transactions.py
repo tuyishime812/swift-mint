@@ -4,7 +4,7 @@ from datetime import datetime
 from models import SendMoney, PayBill, TransactionResponse
 from database import supabase
 from routes.auth import get_current_user
-from email import send_order_placed_email, send_transaction_completed_email
+from email_service import send_order_placed_email, send_transaction_completed_email
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 

@@ -71,6 +71,13 @@ export function apiLogin(input: { email_or_username: string; password: string })
   });
 }
 
+export function apiExchangeSupabaseToken(accessToken: string) {
+  return request<{ token: string; user: UserData; balance: number }>("/api/auth/supabase", {
+    method: "POST",
+    body: { access_token: accessToken },
+  });
+}
+
 export function apiGetMe(token: string) {
   return request<{ user: UserData; balance: number }>("/api/auth/me", { token });
 }

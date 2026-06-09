@@ -118,72 +118,58 @@ def login(data: LoginRequest):
     return {"token": token, "user": _format_user(user)}
 
 
-@router.post("/firebase")
-def firebase_login(data: dict):
-    id_token = data.get("token")
-    if not id_token:
-        raise HTTPException(status_code=400, detail="Missing token")
+@router.post("/supabase")
+def supabase_login(data: dict):
+    access_token = data.get("access_token")
+    if not access_token:
+        raise HTTPException(status_code=400, detail="Missing access token")
 
     try:
-        import firebase_admin
-        from firebase_admin import auth as firebase_auth
-        if not firebase_admin._apps:
-            cred_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH")
-            if cred_path:
-                cred = firebase_admin.credentials.Certificate(cred_path)
-            else:
-                import json
-                cred_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
-                if cred_json:
-                    cred = firebase_admin.credentials.Certificate(json.loads(cred_json))
-                else:
-                    raise HTTPException(status_code=500, detail="Firebase credentials not configured")
-            firebase_admin.initialize_app(cred)
-        decoded = firebase_auth.verify_id_token(id_token)
+        user_data = supabase.auth.get_user(access_token)
+        google_user = user_data.user
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Invalid Firebase token: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Invalid Supabase token: {str(e)}")
 
-    firebase_uid = decoded.get("uid")
-    email = decoded.get("email", f"{firebase_uid}@swiftmint.mw")
-    name = decoded.get("name", decoded.get("email", "User"))
+    google_id = google_user.id
+    email = google_user.email or f"{google_id}@swiftmint.mw"
+    name = google_user.user_metadata.get("full_name", google_user.email or "User")
 
-    result = supabase.table("users").select("*").eq("firebase_uid", firebase_uid).execute()
+    result = supabase.table("users").select("*").eq("email", email).execute()
 
     if result.data:
         user = result.data[0]
-        local_token = create_token(user["id"])
-        wallet = supabase.table("wallets").select("balance").eq("user_id", user["id"]).execute()
-        balance = wallet.data[0]["balance"] if wallet.data else 0
-        return {"token": local_token, "user": _format_user(user), "balance": balance}
+        if not user.get("firebase_uid"):
+            supabase.table("users").update({"firebase_uid": google_id}).eq("id", user["id"]).execute()
+    else:
+        now = datetime.utcnow().isoformat()
+        user_result = supabase.table("users").insert({
+            "name": name,
+            "username": email.split("@")[0],
+            "phone": google_user.phone or "",
+            "email": email,
+            "password_hash": "",
+            "firebase_uid": google_id,
+            "is_admin": False,
+            "created_at": now,
+        }).execute()
 
-    now = datetime.utcnow().isoformat()
+        if not user_result.data:
+            raise HTTPException(status_code=500, detail="Failed to create user")
 
-    user_result = supabase.table("users").insert({
-        "name": name,
-        "username": (email.split("@")[0] + firebase_uid[:4]),
-        "phone": decoded.get("phone_number", ""),
-        "email": email,
-        "password_hash": "",
-        "firebase_uid": firebase_uid,
-        "is_admin": False,
-        "created_at": now,
-    }).execute()
+        user = user_result.data[0]
 
-    if not user_result.data:
-        raise HTTPException(status_code=500, detail="Failed to create user")
-
-    user = user_result.data[0]
-
-    supabase.table("wallets").insert({
-        "user_id": user["id"],
-        "balance": 0,
-        "created_at": now,
-        "updated_at": now,
-    }).execute()
+        supabase.table("wallets").insert({
+            "user_id": user["id"],
+            "balance": 0,
+            "created_at": now,
+            "updated_at": now,
+        }).execute()
 
     local_token = create_token(user["id"])
+    wallet = supabase.table("wallets").select("balance").eq("user_id", user["id"]).execute()
+    balance = wallet.data[0]["balance"] if wallet.data else 0
 
-    return {"token": local_token, "user": _format_user(user), "balance": 0}
+    return {"token": local_token, "user": _format_user(user), "balance": balance}
 
 
 @router.get("/me", response_model=dict)

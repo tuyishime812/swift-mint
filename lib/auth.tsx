@@ -1,11 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "./firebase";
-import { apiGetMe, apiLogin, apiSignup, type UserData } from "./api";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { supabaseClient } from "./supabase";
+import { apiGetMe, apiLogin, apiSignup, apiExchangeSupabaseToken, type UserData } from "./api";
 
 type AuthContext = {
   user: UserData | null;
@@ -36,22 +33,6 @@ function storeToken(t: string) {
 
 function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
-}
-
-async function exchangeFirebaseToken(): Promise<{ token: string; user: UserData; balance: number }> {
-  const currentUser = auth.currentUser;
-  if (!currentUser) throw new Error("Not authenticated with Firebase");
-  const idToken = await currentUser.getIdToken();
-  const res = await fetch(`${API_BASE}/api/auth/firebase`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token: idToken }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || "Firebase auth failed");
-  }
-  return res.json();
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -96,29 +77,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(data.user);
   }, []);
 
-  const loginWithGoogle = useCallback(async () => {
-    await signInWithPopup(auth, googleProvider);
-    const data = await exchangeFirebaseToken();
-    storeToken(data.token);
-    setToken(data.token);
-    setUser(data.user);
-    setBalance(data.balance ?? 0);
+  const handleGoogleAuth = useCallback(async () => {
+    const { error } = await supabaseClient.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+    if (error) throw error;
   }, []);
 
+  const loginWithGoogle = useCallback(async () => {
+    await handleGoogleAuth();
+  }, [handleGoogleAuth]);
+
   const signupWithGoogle = useCallback(async () => {
-    await signInWithPopup(auth, googleProvider);
-    const data = await exchangeFirebaseToken();
-    storeToken(data.token);
-    setToken(data.token);
-    setUser(data.user);
-    setBalance(data.balance ?? 0);
-  }, []);
+    await handleGoogleAuth();
+  }, [handleGoogleAuth]);
 
   const logout = useCallback(() => {
     clearToken();
     setToken(null);
     setUser(null);
     setBalance(0);
+    supabaseClient.auth.signOut();
   }, []);
 
   const refreshBalance = useCallback(async () => {

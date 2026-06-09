@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, Home, MessageCircle } from "lucide-react";
-import { formattedWhatsappNumber } from "@/lib/swiftmint";
+import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 
 export default function NotFound() {
   return (
@@ -37,7 +37,7 @@ export default function NotFound() {
         </div>
         <div className="request-note" style={{ marginTop: 24 }}>
           <MessageCircle size={20} aria-hidden="true" />
-          <span>WhatsApp: {formattedWhatsappNumber}</span>
+          <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">WhatsApp: {formattedWhatsappNumber}</a>
         </div>
       </section>
     </main>

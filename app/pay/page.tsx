@@ -16,7 +16,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { billers } from "@/lib/store";
 import { apiPayBill } from "@/lib/api";
-import { formattedWhatsappNumber } from "@/lib/swiftmint";
+import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 
 function formatCurrency(n: number): string {
   return `MK ${n.toLocaleString("en-MW")}`;
@@ -227,7 +227,7 @@ export default function PayPage() {
             </p>
             <div className="request-note">
               <MessageCircle size={20} />
-              <span>WhatsApp: {formattedWhatsappNumber}</span>
+              <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">WhatsApp: {formattedWhatsappNumber}</a>
             </div>
           </aside>
         </div>
