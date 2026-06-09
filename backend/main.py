@@ -1,7 +1,11 @@
 from fastapi import FastAPI
+from fastapi import Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from collections import defaultdict, deque
 import os
+import time
 
 from routes.auth import router as auth_router
 from routes.wallet import router as wallet_router
@@ -16,15 +20,19 @@ app = FastAPI(
     version="1.0.0",
 )
 
-import re
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+    expose_headers=[],
 )
 
 app.include_router(auth_router)
@@ -32,6 +40,26 @@ app.include_router(wallet_router)
 app.include_router(transactions_router)
 app.include_router(admin_router)
 app.include_router(admin_settings_router)
+
+RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "120"))
+_requests_by_client: dict[str, deque[float]] = defaultdict(deque)
+
+
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    client = request.client.host if request.client else "unknown"
+    key = f"{client}:{request.url.path}"
+    now = time.time()
+    window = _requests_by_client[key]
+
+    while window and now - window[0] > 60:
+        window.popleft()
+
+    if len(window) >= RATE_LIMIT_PER_MINUTE:
+        return JSONResponse({"detail": "Too many requests"}, status_code=429)
+
+    window.append(now)
+    return await call_next(request)
 
 
 @app.get("/")
@@ -41,28 +69,3 @@ def root():
 @app.get("/api/health")
 def health():
     return {"status": "ok", "app": os.getenv("APP_NAME", "SwiftMint")}
-
-
-@app.on_event("startup")
-def create_tables():
-    """Auto-create Supabase tables on startup using direct DB connection."""
-    db_url = os.getenv("SUPABASE_DB_URL")
-    if not db_url:
-        print("[setup] SUPABASE_DB_URL not set. Run backend/schema.sql in Supabase SQL Editor:")
-        print("  https://supabase.com/dashboard/project/qkiflkpwlgxdttijeduq/sql/new")
-        return
-
-    try:
-        import psycopg2
-        conn = psycopg2.connect(db_url)
-        cur = conn.cursor()
-        with open(os.path.join(os.path.dirname(__file__), "schema.sql")) as f:
-            sql = f.read()
-        cur.execute(sql)
-        conn.commit()
-        cur.close()
-        conn.close()
-        print("[setup] Tables created/verified successfully.")
-    except Exception as e:
-        print(f"[setup] Could not auto-create tables: {e}")
-        print("[setup] Run backend/schema.sql in the Supabase SQL Editor.")

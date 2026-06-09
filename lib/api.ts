@@ -4,6 +4,7 @@ type ApiOptions = {
   method?: string;
   body?: unknown;
   token?: string;
+  idempotencyKey?: string;
 };
 
 async function request<T>(path: string, opts: ApiOptions = {}): Promise<T> {
@@ -11,6 +12,7 @@ async function request<T>(path: string, opts: ApiOptions = {}): Promise<T> {
     "Content-Type": "application/json",
   };
   if (opts.token) headers["Authorization"] = `Bearer ${opts.token}`;
+  if (opts.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
 
   const res = await fetch(`${API_BASE}${path}`, {
     method: opts.method || "GET",
@@ -88,8 +90,12 @@ export function apiGetBalance(token: string) {
 }
 
 // Transactions
-export function apiGetTransactions(token: string) {
-  return request<{ transactions: TransactionData[] }>("/api/transactions/", { token });
+export function apiGetTransactions(token: string, input: { limit?: number; offset?: number } = {}) {
+  const params = new URLSearchParams({
+    limit: String(input.limit ?? 50),
+    offset: String(input.offset ?? 0),
+  });
+  return request<{ transactions: TransactionData[]; limit: number; offset: number }>(`/api/transactions/?${params}`, { token });
 }
 
 export function apiSendMoney(token: string, input: {
@@ -98,11 +104,12 @@ export function apiSendMoney(token: string, input: {
   wallet_type: string;
   recipient_number: string;
   amount: number;
-}) {
+}, idempotencyKey?: string) {
   return request<{ success: boolean; reference: string; amount: number; fee: number; total: number; new_balance: number; status: string }>("/api/transactions/send", {
     method: "POST",
     body: input,
     token,
+    idempotencyKey,
   });
 }
 
@@ -110,11 +117,12 @@ export function apiPayBill(token: string, input: {
   biller: string;
   account_number: string;
   amount: number;
-}) {
+}, idempotencyKey?: string) {
   return request<{ success: boolean; reference: string; amount: number; fee: number; total: number; new_balance: number; status: string }>("/api/transactions/pay-bill", {
     method: "POST",
     body: input,
     token,
+    idempotencyKey,
   });
 }
 
@@ -134,12 +142,20 @@ export function apiDeleteTransaction(token: string, txnId: string) {
 }
 
 // Admin
-export function apiAdminAllTransactions(token: string) {
-  return request<{ transactions: TransactionData[] }>("/api/admin/transactions", { token });
+export function apiAdminAllTransactions(token: string, input: { limit?: number; offset?: number } = {}) {
+  const params = new URLSearchParams({
+    limit: String(input.limit ?? 100),
+    offset: String(input.offset ?? 0),
+  });
+  return request<{ transactions: TransactionData[]; limit: number; offset: number }>(`/api/admin/transactions?${params}`, { token });
 }
 
-export function apiAdminAllUsers(token: string) {
-  return request<{ users: UserData[] }>("/api/admin/users", { token });
+export function apiAdminAllUsers(token: string, input: { limit?: number; offset?: number } = {}) {
+  const params = new URLSearchParams({
+    limit: String(input.limit ?? 100),
+    offset: String(input.offset ?? 0),
+  });
+  return request<{ users: UserData[]; limit: number; offset: number }>(`/api/admin/users?${params}`, { token });
 }
 
 export function apiAdminUpdateTransactionStatus(token: string, txnId: string, status: string) {
@@ -157,14 +173,19 @@ export function apiAdminDeleteTransaction(token: string, txnId: string) {
   });
 }
 
-export function apiAdminUsersWithBalance(token: string) {
-  return request<{ users: (UserData & { balance: number })[] }>("/api/admin/users-with-balance", { token });
+export function apiAdminUsersWithBalance(token: string, input: { limit?: number; offset?: number } = {}) {
+  const params = new URLSearchParams({
+    limit: String(input.limit ?? 100),
+    offset: String(input.offset ?? 0),
+  });
+  return request<{ users: (UserData & { balance: number })[]; limit: number; offset: number }>(`/api/admin/users-with-balance?${params}`, { token });
 }
 
-export function apiAdminFundUser(token: string, userId: string, amount: number) {
+export function apiAdminFundUser(token: string, userId: string, amount: number, idempotencyKey?: string) {
   return request<{ success: boolean; new_balance: number; reference: string }>("/api/admin/fund-user", {
     method: "POST",
     body: { user_id: userId, amount },
     token,
+    idempotencyKey,
   });
 }

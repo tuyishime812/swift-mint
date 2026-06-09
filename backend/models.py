@@ -44,7 +44,7 @@ class UserResponse(BaseModel):
 
 
 class FundWallet(BaseModel):
-    amount: float = Field(gt=0)
+    amount: int = Field(gt=0)
     payment_method: str = "Airtel Money"
 
 
@@ -53,13 +53,13 @@ class SendMoney(BaseModel):
     recipient_name: str
     wallet_type: str
     recipient_number: str
-    amount: float = Field(gt=0)
+    amount: int = Field(gt=0)
 
 
 class PayBill(BaseModel):
     biller: str
     account_number: str
-    amount: float = Field(gt=0)
+    amount: int = Field(gt=0)
 
 
 class TransactionResponse(BaseModel):
@@ -67,9 +67,9 @@ class TransactionResponse(BaseModel):
     user_id: str
     type: str
     status: str
-    amount: float
-    fee: float
-    payout: float
+    amount: int
+    fee: int
+    payout: int
     currency: str
     description: str
     reference: str
@@ -84,6 +84,6 @@ class TransactionResponse(BaseModel):
 class WalletResponse(BaseModel):
     id: str
     user_id: str
-    balance: float
+    balance: int
     created_at: str
     updated_at: str

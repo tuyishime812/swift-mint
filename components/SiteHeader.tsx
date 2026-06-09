@@ -6,7 +6,6 @@ import { LogOut, Menu, MessageCircle, Moon, ShieldCheck, Sun, User, X, LogIn } f
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/components/ThemeProvider";
-import { getBalance } from "@/lib/store";
 
 const navItems = [
   { href: "/", label: "Home" },
@@ -20,10 +19,9 @@ const navItems = [
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, balance } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [balance, setBalance] = useState(0);
 
   useEffect(() => {
     if (menuOpen) {
@@ -37,12 +35,6 @@ export function SiteHeader() {
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    setBalance(getBalance());
-    const interval = setInterval(() => setBalance(getBalance()), 2000);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <header className="site-header">

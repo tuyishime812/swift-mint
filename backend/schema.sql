@@ -2,6 +2,8 @@
 -- Run this in the Supabase SQL Editor to create all required tables
 -- Safe to run repeatedly (uses IF NOT EXISTS)
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -27,7 +29,7 @@ CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
 CREATE TABLE IF NOT EXISTS wallets (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  balance DOUBLE PRECISION NOT NULL DEFAULT 0,
+  balance BIGINT NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -38,12 +40,13 @@ CREATE TABLE IF NOT EXISTS transactions (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('send', 'receive', 'fund', 'bill', 'fee')),
   status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed', 'processing', 'completed', 'cancelled')),
-  amount DOUBLE PRECISION NOT NULL,
-  fee DOUBLE PRECISION NOT NULL DEFAULT 0,
-  payout DOUBLE PRECISION NOT NULL DEFAULT 0,
+  amount BIGINT NOT NULL,
+  fee BIGINT NOT NULL DEFAULT 0,
+  payout BIGINT NOT NULL DEFAULT 0,
   currency TEXT NOT NULL DEFAULT 'MWK',
   description TEXT NOT NULL DEFAULT '',
   reference TEXT NOT NULL,
+  idempotency_key TEXT,
   country TEXT,
   recipient_name TEXT,
   wallet_type TEXT,
@@ -58,15 +61,287 @@ CREATE TABLE IF NOT EXISTS bill_payments (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   biller TEXT NOT NULL,
   account_number TEXT NOT NULL,
-  amount DOUBLE PRECISION NOT NULL,
-  fee DOUBLE PRECISION NOT NULL DEFAULT 0,
+  amount BIGINT NOT NULL,
+  fee BIGINT NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'completed',
   reference TEXT NOT NULL,
+  idempotency_key TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Keep existing deployments compatible with integer money storage.
+ALTER TABLE wallets ALTER COLUMN balance TYPE BIGINT USING ROUND(balance)::BIGINT;
+ALTER TABLE transactions ALTER COLUMN amount TYPE BIGINT USING ROUND(amount)::BIGINT;
+ALTER TABLE transactions ALTER COLUMN fee TYPE BIGINT USING ROUND(fee)::BIGINT;
+ALTER TABLE transactions ALTER COLUMN payout TYPE BIGINT USING ROUND(payout)::BIGINT;
+ALTER TABLE bill_payments ALTER COLUMN amount TYPE BIGINT USING ROUND(amount)::BIGINT;
+ALTER TABLE bill_payments ALTER COLUMN fee TYPE BIGINT USING ROUND(fee)::BIGINT;
+
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+ALTER TABLE bill_payments ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_wallets_user_id ON wallets(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_created_at ON transactions(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_bill_payments_user_id ON bill_payments(user_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wallets_user_id_unique ON wallets(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_reference_unique ON transactions(reference);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bill_payments_reference_unique ON bill_payments(reference);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_idempotency_unique
+  ON transactions(user_id, type, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bill_payments_idempotency_unique
+  ON bill_payments(user_id, idempotency_key)
+  WHERE idempotency_key IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION debit_wallet_for_send(
+  p_user_id UUID,
+  p_amount BIGINT,
+  p_fee BIGINT,
+  p_reference TEXT,
+  p_country TEXT,
+  p_recipient_name TEXT,
+  p_wallet_type TEXT,
+  p_recipient_number TEXT,
+  p_idempotency_key TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_wallet wallets%ROWTYPE;
+  v_txn transactions%ROWTYPE;
+  v_total BIGINT := p_amount + p_fee;
+BEGIN
+  IF p_idempotency_key IS NOT NULL THEN
+    SELECT * INTO v_txn
+    FROM transactions
+    WHERE user_id = p_user_id
+      AND type = 'send'
+      AND idempotency_key = p_idempotency_key;
+
+    IF FOUND THEN
+      SELECT * INTO v_wallet FROM wallets WHERE user_id = p_user_id;
+      RETURN jsonb_build_object(
+        'success', true,
+        'reference', v_txn.reference,
+        'amount', v_txn.amount,
+        'fee', v_txn.fee,
+        'total', v_txn.amount + v_txn.fee,
+        'new_balance', COALESCE(v_wallet.balance, 0),
+        'status', v_txn.status,
+        'replayed', true
+      );
+    END IF;
+  END IF;
+
+  SELECT * INTO v_wallet
+  FROM wallets
+  WHERE user_id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Wallet not found' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF v_wallet.balance < v_total THEN
+    RAISE EXCEPTION 'Insufficient wallet balance' USING ERRCODE = 'P0001';
+  END IF;
+
+  UPDATE wallets
+  SET balance = balance - v_total,
+      updated_at = NOW()
+  WHERE id = v_wallet.id
+  RETURNING * INTO v_wallet;
+
+  INSERT INTO transactions (
+    user_id, type, status, amount, fee, payout, currency, description,
+    reference, idempotency_key, country, recipient_name, wallet_type,
+    recipient_number, created_at, updated_at
+  )
+  VALUES (
+    p_user_id, 'send', 'pending', p_amount, p_fee, p_amount, 'MWK',
+    'Send to ' || p_recipient_name || ' (' || p_country || ') via ' || p_wallet_type,
+    p_reference, p_idempotency_key, p_country, p_recipient_name, p_wallet_type,
+    p_recipient_number, NOW(), NOW()
+  )
+  RETURNING * INTO v_txn;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'reference', v_txn.reference,
+    'amount', v_txn.amount,
+    'fee', v_txn.fee,
+    'total', v_txn.amount + v_txn.fee,
+    'new_balance', v_wallet.balance,
+    'status', v_txn.status,
+    'replayed', false
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION debit_wallet_for_bill(
+  p_user_id UUID,
+  p_biller TEXT,
+  p_account_number TEXT,
+  p_amount BIGINT,
+  p_fee BIGINT,
+  p_reference TEXT,
+  p_idempotency_key TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_wallet wallets%ROWTYPE;
+  v_txn transactions%ROWTYPE;
+  v_total BIGINT := p_amount + p_fee;
+BEGIN
+  IF p_idempotency_key IS NOT NULL THEN
+    SELECT * INTO v_txn
+    FROM transactions
+    WHERE user_id = p_user_id
+      AND type = 'bill'
+      AND idempotency_key = p_idempotency_key;
+
+    IF FOUND THEN
+      SELECT * INTO v_wallet FROM wallets WHERE user_id = p_user_id;
+      RETURN jsonb_build_object(
+        'success', true,
+        'reference', v_txn.reference,
+        'amount', v_txn.amount,
+        'fee', v_txn.fee,
+        'total', v_txn.amount + v_txn.fee,
+        'new_balance', COALESCE(v_wallet.balance, 0),
+        'status', v_txn.status,
+        'replayed', true
+      );
+    END IF;
+  END IF;
+
+  SELECT * INTO v_wallet
+  FROM wallets
+  WHERE user_id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Wallet not found' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF v_wallet.balance < v_total THEN
+    RAISE EXCEPTION 'Insufficient wallet balance' USING ERRCODE = 'P0001';
+  END IF;
+
+  UPDATE wallets
+  SET balance = balance - v_total,
+      updated_at = NOW()
+  WHERE id = v_wallet.id
+  RETURNING * INTO v_wallet;
+
+  INSERT INTO transactions (
+    user_id, type, status, amount, fee, payout, currency, description,
+    reference, idempotency_key, created_at, updated_at
+  )
+  VALUES (
+    p_user_id, 'bill', 'completed', p_amount, p_fee, p_amount, 'MWK',
+    'Bill payment to ' || p_biller,
+    p_reference, p_idempotency_key, NOW(), NOW()
+  )
+  RETURNING * INTO v_txn;
+
+  INSERT INTO bill_payments (
+    user_id, biller, account_number, amount, fee, status, reference,
+    idempotency_key, created_at
+  )
+  VALUES (
+    p_user_id, p_biller, p_account_number, p_amount, p_fee, 'completed',
+    p_reference, p_idempotency_key, NOW()
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'reference', v_txn.reference,
+    'amount', v_txn.amount,
+    'fee', v_txn.fee,
+    'total', v_txn.amount + v_txn.fee,
+    'new_balance', v_wallet.balance,
+    'status', v_txn.status,
+    'replayed', false
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION credit_wallet_by_admin(
+  p_user_id UUID,
+  p_admin_id UUID,
+  p_amount BIGINT,
+  p_reference TEXT,
+  p_idempotency_key TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_wallet wallets%ROWTYPE;
+  v_txn transactions%ROWTYPE;
+BEGIN
+  IF p_idempotency_key IS NOT NULL THEN
+    SELECT * INTO v_txn
+    FROM transactions
+    WHERE user_id = p_user_id
+      AND type = 'fund'
+      AND idempotency_key = p_idempotency_key;
+
+    IF FOUND THEN
+      SELECT * INTO v_wallet FROM wallets WHERE user_id = p_user_id;
+      RETURN jsonb_build_object(
+        'success', true,
+        'reference', v_txn.reference,
+        'new_balance', COALESCE(v_wallet.balance, 0),
+        'replayed', true
+      );
+    END IF;
+  END IF;
+
+  SELECT * INTO v_wallet
+  FROM wallets
+  WHERE user_id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Wallet not found' USING ERRCODE = 'P0002';
+  END IF;
+
+  UPDATE wallets
+  SET balance = balance + p_amount,
+      updated_at = NOW()
+  WHERE id = v_wallet.id
+  RETURNING * INTO v_wallet;
+
+  INSERT INTO transactions (
+    user_id, type, status, amount, fee, payout, currency, description,
+    reference, idempotency_key, created_at, updated_at
+  )
+  VALUES (
+    p_user_id, 'fund', 'completed', p_amount, 0, p_amount, 'MWK',
+    'Manual funding by admin ' || p_admin_id::TEXT,
+    p_reference, p_idempotency_key, NOW(), NOW()
+  )
+  RETURNING * INTO v_txn;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'reference', v_txn.reference,
+    'new_balance', v_wallet.balance,
+    'replayed', false
+  );
+END;
+$$;

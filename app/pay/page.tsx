@@ -14,12 +14,19 @@ import {
   Zap,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { billers } from "@/lib/store";
+import { billers } from "@/lib/billers";
 import { apiPayBill } from "@/lib/api";
 import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 
 function formatCurrency(n: number): string {
   return `MK ${n.toLocaleString("en-MW")}`;
+}
+
+function createIdempotencyKey(prefix: string): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 const billerIcon = (id: string): React.ElementType => {
@@ -30,7 +37,7 @@ const billerIcon = (id: string): React.ElementType => {
 };
 
 export default function PayPage() {
-  const { user, token, balance, loading: authLoading } = useAuth();
+  const { user, token, balance, loading: authLoading, refreshBalance } = useAuth();
   const router = useRouter();
   const [loaded, setLoaded] = useState(false);
   const [selectedBiller, setSelectedBiller] = useState(billers[0]);
@@ -66,10 +73,11 @@ export default function PayPage() {
       const data = await apiPayBill(token, {
         biller: selectedBiller.name,
         account_number: accountNumber.trim(),
-        amount: numAmount,
-      });
+        amount: Math.round(numAmount),
+      }, createIdempotencyKey("bill"));
       setResult({ reference: data.reference, amount: data.amount, fee: data.fee, total: data.total });
       setSuccess(true);
+      await refreshBalance();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Payment failed.");
     } finally {

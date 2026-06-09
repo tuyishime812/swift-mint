@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime
 
 from database import supabase
@@ -9,21 +9,31 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 @router.get("/transactions")
-def admin_list_transactions(admin: dict = Depends(require_admin)):
+def admin_list_transactions(
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    admin: dict = Depends(require_admin),
+):
     result = supabase.table("transactions") \
         .select("*") \
         .order("created_at", desc=True) \
+        .range(offset, offset + limit - 1) \
         .execute()
-    return {"transactions": result.data}
+    return {"transactions": result.data, "limit": limit, "offset": offset}
 
 
 @router.get("/users")
-def admin_list_users(admin: dict = Depends(require_admin)):
+def admin_list_users(
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    admin: dict = Depends(require_admin),
+):
     result = supabase.table("users") \
         .select("id, name, phone, email, created_at") \
         .order("created_at", desc=True) \
+        .range(offset, offset + limit - 1) \
         .execute()
-    return {"users": result.data}
+    return {"users": result.data, "limit": limit, "offset": offset}
 
 
 @router.patch("/transactions/{txn_id}/status")

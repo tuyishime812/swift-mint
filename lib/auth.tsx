@@ -68,6 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     storeToken(data.token);
     setToken(data.token);
     setUser(data.user);
+    const me = await apiGetMe(data.token);
+    setBalance(me.balance);
   }, []);
 
   const signup = useCallback(async (name: string, email: string, phone: string, username: string, password: string) => {
@@ -75,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     storeToken(data.token);
     setToken(data.token);
     setUser(data.user);
+    setBalance(0);
   }, []);
 
   const handleGoogleAuth = useCallback(async () => {

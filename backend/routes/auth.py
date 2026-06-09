@@ -14,7 +14,10 @@ load_dotenv()
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-SECRET_KEY = os.getenv("APP_SECRET", "super-secret-key-change-in-production")
+SECRET_KEY = os.getenv("APP_SECRET")
+if not SECRET_KEY:
+    raise RuntimeError("APP_SECRET is required")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 
@@ -29,7 +32,10 @@ def create_token(user_id: str) -> str:
 
 
 def get_current_user(authorization: str = Header(...)) -> dict:
-    token = authorization.replace("Bearer ", "")
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+
+    token = authorization.removeprefix("Bearer ").strip()
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
@@ -87,12 +93,12 @@ def signup(data: SignupRequest):
 
     user = user_result.data[0]
 
-    supabase.table("wallets").insert({
+    supabase.table("wallets").upsert({
         "user_id": user["id"],
         "balance": 0,
         "created_at": now,
         "updated_at": now,
-    }).execute()
+    }, on_conflict="user_id").execute()
 
     token = create_token(user["id"])
 
@@ -144,7 +150,7 @@ def supabase_login(data: dict):
         now = datetime.utcnow().isoformat()
         user_result = supabase.table("users").insert({
             "name": name,
-            "username": email.split("@")[0],
+            "username": f"{email.split('@')[0]}-{google_id[:8]}",
             "phone": google_user.phone or "",
             "email": email,
             "password_hash": "",
@@ -158,12 +164,12 @@ def supabase_login(data: dict):
 
         user = user_result.data[0]
 
-        supabase.table("wallets").insert({
+        supabase.table("wallets").upsert({
             "user_id": user["id"],
             "balance": 0,
             "created_at": now,
             "updated_at": now,
-        }).execute()
+        }, on_conflict="user_id").execute()
 
     local_token = create_token(user["id"])
     wallet = supabase.table("wallets").select("balance").eq("user_id", user["id"]).execute()

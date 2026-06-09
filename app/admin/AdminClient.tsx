@@ -52,6 +52,13 @@ function formatDate(iso: string): string {
   });
 }
 
+function createIdempotencyKey(prefix: string): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 const statusConfig: Record<string, { label: string; className: string }> = {
   pending: { label: "Pending", className: "badge-pending" },
   confirmed: { label: "Confirmed", className: "badge-confirmed" },
@@ -90,8 +97,8 @@ export function AdminClient() {
     if (!token) return;
     try {
       const [txnRes, userRes] = await Promise.all([
-        apiAdminAllTransactions(token),
-        apiAdminUsersWithBalance(token).catch(() => apiAdminAllUsers(token)),
+        apiAdminAllTransactions(token, { limit: 200 }),
+        apiAdminUsersWithBalance(token, { limit: 200 }).catch(() => apiAdminAllUsers(token, { limit: 200 })),
       ]);
       setAllTxns(txnRes.transactions);
       setAllUsers(userRes.users);
@@ -128,7 +135,7 @@ export function AdminClient() {
     if (!amount || amount <= 0 || !fundUserId || !token) return;
     setFunding(true);
     try {
-      await apiAdminFundUser(token, fundUserId, amount);
+      await apiAdminFundUser(token, fundUserId, Math.round(amount), createIdempotencyKey("fund"));
       setFundUserId("");
       setFundAmount("");
       await fetchData();

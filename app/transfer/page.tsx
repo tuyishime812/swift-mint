@@ -12,7 +12,7 @@ import {
   Smartphone,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { getSettings, type CountrySetting } from "@/lib/settings";
+import { getSettings } from "@/lib/settings";
 import { type TransferRequestInput, whatsappNumber, formattedWhatsappNumber, countries } from "@/lib/swiftmint";
 import { apiSendMoney } from "@/lib/api";
 import { fetchFxRates, getFxRate, convertMwK } from "@/lib/fx";
@@ -21,8 +21,15 @@ function formatCurrency(n: number): string {
   return `MK ${n.toLocaleString("en-MW")}`;
 }
 
+function createIdempotencyKey(prefix: string): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export default function TransferPage() {
-  const { user, token, loading: authLoading } = useAuth();
+  const { user, token, loading: authLoading, refreshBalance } = useAuth();
   const router = useRouter();
   const settings = useMemo(() => getSettings(), []);
   const dynamicCountries = settings.countries;
@@ -58,7 +65,7 @@ export default function TransferPage() {
   );
 
   const numAmount = Number(form.amount) || 0;
-  const rate = 0.03;
+  const rate = numAmount >= 300000 ? 0.035 : 0.06;
   const rawFee = numAmount * rate;
   const fee = Math.max(Math.round(rawFee), 5000);
   const total = numAmount + fee;
@@ -74,8 +81,8 @@ export default function TransferPage() {
   );
 
   const localCurrencyPayout = useMemo(
-    () => fxRate > 0 ? convertMwK(numAmount - fee, fxRate) : null,
-    [numAmount, fee, fxRate],
+    () => fxRate > 0 ? convertMwK(numAmount, fxRate) : null,
+    [numAmount, fxRate],
   );
 
   function updateField(field: keyof TransferRequestInput, value: string) {
@@ -119,10 +126,11 @@ export default function TransferPage() {
         recipient_name: form.recipientName,
         wallet_type: form.walletType,
         recipient_number: form.recipientNumber,
-        amount: numAmount,
-      });
+        amount: Math.round(numAmount),
+      }, createIdempotencyKey("send"));
       setResult({ reference: data.reference, amount: data.amount, fee: data.fee, total: data.total });
       setSuccess(true);
+      await refreshBalance();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Order submission failed.");
     } finally {
@@ -251,7 +259,7 @@ export default function TransferPage() {
                 {numAmount > 0 ? (
                   <div className="transfer-fee-preview">
                     <div className="transfer-fee-row">
-                      <span>Fee (3%)</span>
+                      <span>Fee ({rate === 0.035 ? "3.5%" : "6%"})</span>
                       <strong>{formatCurrency(fee)}</strong>
                     </div>
                     <div className="transfer-fee-row">
