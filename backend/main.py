@@ -34,6 +34,10 @@ app.include_router(admin_router)
 app.include_router(admin_settings_router)
 
 
+@app.get("/")
+def root():
+    return {"status": "ok", "app": os.getenv("APP_NAME", "SwiftMint"), "docs": "/docs"}
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "app": os.getenv("APP_NAME", "SwiftMint")}
