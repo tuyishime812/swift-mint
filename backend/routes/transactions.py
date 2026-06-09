@@ -48,7 +48,7 @@ def send_money(input: SendMoney, user: dict = Depends(get_current_user)):
     total = input.amount + fee
 
     if wallet["balance"] < total:
-        raise HTTPException(status_code=400, detail="Insufficient wallet balance. Please fund your wallet first.")
+        raise HTTPException(status_code=400, detail="Insufficient wallet balance. Fund your wallet via WhatsApp — send money to our payment number and contact us on WhatsApp to get credited.")
 
     new_balance = wallet["balance"] - total
     ref = _generate_ref()

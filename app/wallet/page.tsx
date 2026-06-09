@@ -8,18 +8,12 @@ import {
   Banknote,
   CheckCircle2,
   Copy,
-  Loader2,
   MessageCircle,
   Smartphone,
-  TrendingUp,
   Wallet,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import {
-  type TransactionData,
-  apiFundWallet,
-  apiGetTransactions,
-} from "@/lib/api";
+import { type TransactionData, apiGetTransactions } from "@/lib/api";
 import { getSettings } from "@/lib/settings";
 import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 
@@ -34,14 +28,10 @@ function formatDate(iso: string): string {
 }
 
 export default function WalletPage() {
-  const { user, token, balance, loading: authLoading, refreshBalance } = useAuth();
+  const { user, token, balance, loading: authLoading } = useAuth();
   const router = useRouter();
   const [txns, setTxns] = useState<TransactionData[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [fundAmount, setFundAmount] = useState("");
-  const [fundMethod, setFundMethod] = useState(getSettings().paymentMethods[0]);
-  const [funding, setFunding] = useState(false);
-  const [fundDone, setFundDone] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -62,32 +52,15 @@ export default function WalletPage() {
     }
   }, [user, token, authLoading, router, fetchData]);
 
-  async function handleFund(e: React.FormEvent) {
-    e.preventDefault();
-    const amount = Number(fundAmount);
-    if (!amount || amount <= 0) return;
-    if (!token) return;
-    setFunding(true);
-    try {
-      await apiFundWallet(token, amount, fundMethod);
-      await refreshBalance();
-      await fetchData();
-      setFundDone(true);
-      setFundAmount("");
-      setTimeout(() => setFundDone(false), 3000);
-    } catch {
-      // ignore
-    } finally {
-      setFunding(false);
-    }
-  }
-
+  const settings = getSettings();
   const sortedTxns = [...txns]
     .filter((t) => t.type === "fund" || t.type === "send" || t.type === "bill")
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 10);
 
-  const copyRef = user?.id || "";
+  const whatsappMsg = encodeURIComponent(
+    `Hi, I want to fund my wallet.\n\nName: ${user?.name}\nAmount: MK \nPayment method: \nTransaction reference:`
+  );
 
   if (!loaded) {
     return (
@@ -109,9 +82,9 @@ export default function WalletPage() {
     <main>
       <section className="page-hero">
         <div className="page-hero-inner">
-          <p className="eyebrow">SwiftMint Wallet</p>
+          <p className="eyebrow">Wallet</p>
           <h1>Your digital wallet</h1>
-          <p>Fund your wallet, send money, pay bills, and track everything in one place.</p>
+          <p>Check your balance and fund your wallet via mobile money.</p>
         </div>
       </section>
 
@@ -125,11 +98,6 @@ export default function WalletPage() {
                 <ArrowRight size={17} />
                 Send money
               </Link>
-              <button className="button button-secondary" type="button"
-                onClick={() => document.getElementById("fund-form")?.scrollIntoView({ behavior: "smooth" })}>
-                <TrendingUp size={17} />
-                Fund wallet
-              </button>
             </div>
           </div>
           <div className="wallet-quick-links">
@@ -147,57 +115,40 @@ export default function WalletPage() {
         </div>
       </section>
 
-      <section className="section" aria-labelledby="fund-title" id="fund-form">
+      <section className="section" aria-labelledby="fund-title">
         <div className="wallet-fund-layout">
           <div className="auth-card">
-            <strong className="auth-form-title">Fund your wallet</strong>
+            <strong className="auth-form-title" id="fund-title">How to fund your wallet</strong>
             <p className="wallet-fund-text">
-              Choose an amount and payment method to add funds to your SwiftMint Wallet.
+              Funding is done via mobile money. Send your payment to one of our numbers, then contact us on WhatsApp with the details.
             </p>
-            {fundDone ? (
-              <div className="auth-success">
-                <CheckCircle2 size={40} />
-                <h3>Wallet funded!</h3>
-                <p>Your balance has been updated.</p>
-              </div>
-            ) : (
-              <form className="auth-form" onSubmit={handleFund}>
-                <label>
-                  <span>Amount (MWK)</span>
-                  <input
-                    type="number" min="1000" step="1000" required
-                    placeholder="e.g. 50000"
-                    value={fundAmount}
-                    onChange={(e) => setFundAmount(e.target.value)}
-                  />
-                </label>
-                <label>
-                  <span>Payment method</span>
-                  <select value={fundMethod} onChange={(e) => setFundMethod(e.target.value)}>
-                    {getSettings().paymentMethods.map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                </label>
-                <button className="button button-primary form-submit" type="submit" disabled={funding}>
-                  {funding ? <Loader2 className="spin" size={18} /> : <Wallet size={18} />}
-                  {funding ? "Processing..." : "Fund wallet"}
-                </button>
-              </form>
-            )}
+            <div style={{ marginTop: "1.5rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {settings.paymentMethods.map((m) => (
+                <div key={m} className="request-note" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <Smartphone size={18} />
+                  <span><strong>{m}:</strong> {formattedWhatsappNumber}</span>
+                </div>
+              ))}
+            </div>
+            <a
+              className="button button-primary form-submit"
+              href={`https://wa.me/${whatsappNumber}?text=${whatsappMsg}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ marginTop: "1.5rem" }}
+            >
+              <MessageCircle size={18} />
+              Fund via WhatsApp
+            </a>
           </div>
           <aside className="auth-sidebar">
-            <strong className="auth-sidebar-title">How to fund</strong>
+            <strong className="auth-sidebar-title">Steps to fund</strong>
             <ol className="wallet-fund-steps">
-              <li>Enter the amount you want to add.</li>
-              <li>Select your preferred payment method.</li>
-              <li>Click &quot;Fund wallet&quot; to complete.</li>
-              <li>Funds are added to your balance instantly.</li>
+              <li>Send money to one of our payment numbers above.</li>
+              <li>Take a screenshot of your payment confirmation.</li>
+              <li>Click &quot;Fund via WhatsApp&quot; and send us the screenshot &amp; details.</li>
+              <li>We verify and credit your wallet within minutes.</li>
             </ol>
-            <div className="request-note">
-              <MessageCircle size={20} />
-              <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">WhatsApp: {formattedWhatsappNumber}</a>
-            </div>
           </aside>
         </div>
       </section>

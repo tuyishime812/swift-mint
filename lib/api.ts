@@ -87,14 +87,6 @@ export function apiGetBalance(token: string) {
   return request<{ balance: number; wallet_id: string }>("/api/wallet/balance", { token });
 }
 
-export function apiFundWallet(token: string, amount: number, payment_method: string) {
-  return request<{ balance: number; reference: string }>("/api/wallet/fund", {
-    method: "POST",
-    body: { amount, payment_method },
-    token,
-  });
-}
-
 // Transactions
 export function apiGetTransactions(token: string) {
   return request<{ transactions: TransactionData[] }>("/api/transactions/", { token });
