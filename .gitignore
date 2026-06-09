@@ -12,3 +12,6 @@ __pycache__/
 *.pyc
 tsconfig.tsbuildinfo
 next-env.d.ts
+
+.vercel
+.env*.local
