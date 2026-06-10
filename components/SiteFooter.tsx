@@ -1,77 +1,73 @@
-import Image from "next/image";
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
-import { countries, formattedWhatsappNumber, whatsappNumber } from "@/lib/swiftmint";
+import { MessageCircle, ShieldCheck, MapPin, Mail } from "lucide-react";
+import { formattedWhatsappNumber, whatsappNumber } from "@/lib/swiftmint";
 
 export function SiteFooter() {
   return (
     <footer className="site-footer">
-      <div className="footer-grid">
-        <div className="footer-col">
-          <strong className="footer-heading">Company</strong>
-          <Link href="/about">About Us</Link>
-          <Link href="/service">Our Service</Link>
-          <Link href="/news">News & Insights</Link>
-          <Link href="/careers">Careers</Link>
-          <Link href="/contact">Contact</Link>
-        </div>
-        <div className="footer-col">
-          <strong className="footer-heading">Products</strong>
-          <Link href="/transfer">Send Money</Link>
-          <Link href="/wallet">SwiftMint Wallet</Link>
-          <Link href="/pay">SwiftMint Pay</Link>
-          <Link href="/rates">Check Rates</Link>
-        </div>
-        <div className="footer-col">
-          <strong className="footer-heading">Send to</strong>
-          {countries.map((c) => (
-            <Link key={c.slug} href={`/countries/${c.slug}`}>
-              <Image
-                src={`https://flagcdn.com/48x36/${c.code.toLowerCase()}.png`}
-                alt=""
-                width={16}
-                height={12}
-                className="footer-flag"
-              />
-              {c.name}
-            </Link>
-          ))}
-        </div>
-        <div className="footer-col">
-          <strong className="footer-heading">My Account</strong>
-          <Link href="/signup">Sign Up</Link>
-          <Link href="/login">Login</Link>
-          <Link href="/dashboard">Dashboard</Link>
-          <Link href="/transfer">New Transfer</Link>
-        </div>
-        <div className="footer-col">
-          <strong className="footer-heading">Support</strong>
-          <Link href="/faq">FAQ</Link>
-          <Link href="/locations">Branches & Booths</Link>
-          <Link href="/partners">Pay-in & Payout Partners</Link>
-          <Link href="/fraud-prevention">Fraud Prevention</Link>
-          <Link href="/contact">Get in Touch</Link>
-          <a href={`https://wa.me/${whatsappNumber}`}>
-            <MessageCircle size={16} aria-hidden="true" />
-            {formattedWhatsappNumber}
-          </a>
-        </div>
-        <div className="footer-col">
-          <strong className="footer-heading">Legal</strong>
-          <Link href="/privacy">Privacy Policy</Link>
-          <Link href="/terms">Terms of Service</Link>
-          <Link href="/faq">FAQs</Link>
-        </div>
-        <div className="footer-col footer-brand-col">
+      <div className="footer-inner">
+        <div className="footer-brand-section">
           <strong className="footer-brand">SwiftMint Exchange</strong>
-          <span className="footer-tagline">
-            Premium Outbound Mobile Money Facilitation from Malawi.
-          </span>
+          <p className="footer-tagline">
+            Premium outbound mobile money facilitation from Malawi to Africa and beyond.
+          </p>
+          <div className="footer-contact-row">
+            <a href={`https://wa.me/${whatsappNumber}`} className="footer-contact-link">
+              <MessageCircle size={16} />
+              {formattedWhatsappNumber}
+            </a>
+            <a href="mailto:support@swiftmint.mw" className="footer-contact-link">
+              <Mail size={16} />
+              support@swiftmint.mw
+            </a>
+          </div>
+        </div>
+
+        <div className="footer-links-grid">
+          <div className="footer-col">
+            <strong className="footer-heading">Company</strong>
+            <Link href="/about">About Us</Link>
+            <Link href="/service">Our Service</Link>
+            <Link href="/news">News & Insights</Link>
+            <Link href="/careers">Careers</Link>
+            <Link href="/contact">Contact</Link>
+          </div>
+          <div className="footer-col">
+            <strong className="footer-heading">Products</strong>
+            <Link href="/transfer">Send Money</Link>
+            <Link href="/wallet">SwiftMint Wallet</Link>
+            <Link href="/pay">SwiftMint Pay</Link>
+            <Link href="/rates">Check Rates</Link>
+            <Link href="/countries">All Countries</Link>
+          </div>
+          <div className="footer-col">
+            <strong className="footer-heading">Account</strong>
+            <Link href="/signup">Sign Up</Link>
+            <Link href="/login">Login</Link>
+            <Link href="/dashboard">Dashboard</Link>
+            <Link href="/transfer">New Transfer</Link>
+          </div>
+          <div className="footer-col">
+            <strong className="footer-heading">Support</strong>
+            <Link href="/faq">FAQ</Link>
+            <Link href="/locations">Branches & Booths</Link>
+            <Link href="/partners">Partners</Link>
+            <Link href="/fraud-prevention">Fraud Prevention</Link>
+          </div>
+          <div className="footer-col">
+            <strong className="footer-heading">Legal</strong>
+            <Link href="/privacy">Privacy Policy</Link>
+            <Link href="/terms">Terms of Service</Link>
+            <Link href="/faq">FAQs</Link>
+          </div>
         </div>
       </div>
+
       <div className="footer-bottom">
-        <span>&copy; {new Date().getFullYear()} SwiftMint Exchange. All rights reserved.</span>
-        <span className="footer-compliance">Business Registration &bull; Licensed Money Transfer Facilitator</span>
+        <div className="footer-bottom-inner">
+          <span>&copy; {new Date().getFullYear()} SwiftMint Exchange. All rights reserved.</span>
+          <span className="footer-compliance">Licensed Money Transfer Facilitator &bull; Malawi</span>
+        </div>
       </div>
     </footer>
   );

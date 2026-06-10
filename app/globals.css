@@ -1030,38 +1030,80 @@ h3 {
 }
 
 .site-footer {
-  border-top: 1px solid var(--line);
   background: var(--surface);
-  padding: 48px clamp(18px, 4vw, 56px) 28px;
+  border-top: 1px solid var(--line);
+  padding: 56px clamp(18px, 4vw, 56px) 0;
 }
 
-.footer-grid {
-  display: grid;
-  gap: 32px;
-  grid-template-columns: repeat(4, 1fr);
+.footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 48px;
   margin: 0 auto;
   max-width: 1180px;
 }
 
-.footer-bottom {
-  border-top: 1px solid var(--line);
+.footer-brand-section {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  max-width: 320px;
+  flex: 1 1 280px;
+}
+
+.footer-brand {
+  color: var(--ink);
+  font-size: 1.15rem;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.footer-tagline {
   color: var(--muted);
-  font-size: 0.85rem;
-  margin: 32px auto 0;
-  max-width: 1180px;
-  padding-top: 22px;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.footer-contact-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-top: 4px;
+}
+
+.footer-contact-link {
+  align-items: center;
+  color: var(--brand-strong);
+  display: inline-flex;
+  font-size: 0.88rem;
+  font-weight: 700;
+  gap: 6px;
+  transition: opacity 160ms ease;
+  width: fit-content;
+}
+
+.footer-contact-link:hover {
+  opacity: 0.75;
+}
+
+.footer-links-grid {
+  display: grid;
+  gap: 32px;
+  flex: 3 1 500px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 
 .footer-col {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   align-content: start;
 }
 
 .footer-col a {
   color: var(--muted);
-  font-size: 0.92rem;
-  font-weight: 750;
+  font-size: 0.9rem;
+  font-weight: 550;
   transition: color 160ms ease;
   width: fit-content;
 }
@@ -1072,22 +1114,33 @@ h3 {
 
 .footer-heading {
   color: var(--ink);
-  font-size: 0.82rem;
-  letter-spacing: 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
-.footer-brand {
-  color: var(--ink);
-  font-size: 1rem;
-  font-weight: 850;
+.footer-bottom {
+  border-top: 1px solid var(--line);
+  margin-top: 48px;
 }
 
-.footer-tagline {
+.footer-bottom-inner {
+  align-items: center;
   color: var(--muted);
-  font-size: 0.92rem;
-  line-height: 1.62;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  gap: 8px 24px;
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 18px 0;
+}
+
+.footer-compliance {
+  opacity: 0.7;
 }
 
 
@@ -1181,8 +1234,7 @@ h3 {
   line-height: 1;
 }
 
-.chip-flag,
-.footer-flag {
+.chip-flag {
   border-radius: 2px;
   flex: 0 0 auto;
   object-fit: cover;
