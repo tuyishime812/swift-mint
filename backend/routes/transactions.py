@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 
 from database import supabase
 from email_service import send_order_placed_email, send_transaction_completed_email
-from models import PayBill, SendMoney
+from models import PayBill, SendMoney, UpdateTransactionStatus, SendMoneyResponse, PayBillResponse
 from routes.auth import get_current_user
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
@@ -66,7 +66,7 @@ def list_transactions(
     return {"transactions": result.data, "limit": limit, "offset": offset}
 
 
-@router.post("/send", response_model=dict)
+@router.post("/send", response_model=SendMoneyResponse)
 def send_money(
     input: SendMoney,
     background_tasks: BackgroundTasks,
@@ -119,7 +119,7 @@ def send_money(
     return data
 
 
-@router.post("/pay-bill", response_model=dict)
+@router.post("/pay-bill", response_model=PayBillResponse)
 def pay_bill(
     input: PayBill,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
@@ -154,11 +154,11 @@ def pay_bill(
 @router.patch("/{txn_id}/status", response_model=dict)
 def update_transaction_status(
     txn_id: str,
-    body: dict,
+    body: UpdateTransactionStatus,
     background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user),
 ):
-    status = body.get("status")
+    status = body.status.value
     valid_statuses = ["pending", "confirmed", "processing", "completed", "cancelled"]
     if status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}")

@@ -16,6 +16,7 @@ import { PayoutCalculator } from "@/components/PayoutCalculator";
 import { PricingCards } from "@/components/PricingCards";
 import { TransferForm } from "@/components/TransferForm";
 import { HomeActions } from "@/components/HomeActions";
+import { LiveTestimonials } from "@/components/LiveTestimonials";
 import { acceptedPaymentMethods, countries, whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 
 const benefits = [
@@ -59,26 +60,7 @@ const whyMukuru = [
   },
 ];
 
-const testimonials = [
-  {
-    name: "Grace M.",
-    location: "Lilongwe",
-    text: "SwiftMint made it so easy to send money to my sister in Kenya. The WhatsApp process is straightforward and I knew the exact payout before approving.",
-    stars: 5,
-  },
-  {
-    name: "Peter K.",
-    location: "Blantyre",
-    text: "I send money to Tanzania every month for my business. SwiftMint's pricing is transparent and the confirmation before processing gives me peace of mind.",
-    stars: 5,
-  },
-  {
-    name: "Chifundo B.",
-    location: "Mzuzu",
-    text: "The dashboard helps me track all my transfers in one place. Customer service on WhatsApp is always responsive and helpful.",
-    stars: 5,
-  },
-];
+
 
 const services = [
   {
@@ -253,34 +235,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="testimonials-section" aria-labelledby="testimonials-title">
-        <div className="section testimonials-section-inner">
-          <div className="section-heading">
-            <p className="eyebrow">What our customers say</p>
-            <h2 id="testimonials-title">Trusted by customers across Malawi</h2>
-            <p>
-              We help our customers and their loved ones send and receive money
-              easily. Here&apos;s what they have to say about SwiftMint.
-            </p>
-          </div>
-          <div className="testimonials-grid">
-            {testimonials.map((t) => (
-              <blockquote className="testimonial-card" key={t.name}>
-                <div className="testimonial-stars">
-                  {Array.from({ length: t.stars }, (_, i) => (
-                    <Star key={i} size={16} fill="var(--accent)" color="var(--accent)" aria-hidden="true" />
-                  ))}
-                </div>
-                <p className="testimonial-text">&ldquo;{t.text}&rdquo;</p>
-                <footer className="testimonial-author">
-                  <strong>{t.name}</strong>
-                  <span>{t.location}</span>
-                </footer>
-              </blockquote>
-            ))}
-          </div>
-        </div>
-      </section>
+      <LiveTestimonials />
 
       <section className="pricing-band" aria-labelledby="pricing-title">
         <div>

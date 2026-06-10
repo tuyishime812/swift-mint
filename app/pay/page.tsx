@@ -52,8 +52,8 @@ export default function PayPage() {
 
   useEffect(() => {
     if (!authLoading && !user) { router.push("/login"); return; }
-    if (user) setLoaded(true);
-  }, [user, authLoading, router]);
+    if (user) { setLoaded(true); refreshBalance(); }
+  }, [user, authLoading, router, refreshBalance]);
 
   const numAmount = Number(amount) || 0;
   const fee = Math.round(numAmount * 0.02);

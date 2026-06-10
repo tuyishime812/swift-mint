@@ -23,7 +23,10 @@ async function request<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.detail || `Request failed (${res.status})`);
+    const msg = Array.isArray(data.detail)
+      ? data.detail.map((e: { msg?: string }) => e.msg || JSON.stringify(e)).join("; ")
+      : data.detail || `Request failed (${res.status})`;
+    throw new Error(msg);
   }
 
   return data as T;
@@ -187,5 +190,49 @@ export function apiAdminFundUser(token: string, userId: string, amount: number, 
     body: { user_id: userId, amount },
     token,
     idempotencyKey,
+  });
+}
+
+// Testimonials
+export type TestimonialData = {
+  id: string;
+  user_id?: string;
+  name: string;
+  location: string;
+  text: string;
+  stars: number;
+  is_approved: boolean;
+  created_at: string;
+};
+
+export function apiGetTestimonials() {
+  return request<{ testimonials: TestimonialData[] }>("/api/testimonials");
+}
+
+export function apiCreateTestimonial(token: string, input: { text: string; name?: string; location?: string; stars?: number }) {
+  return request<{ testimonial: TestimonialData }>("/api/testimonials", {
+    method: "POST",
+    body: input,
+    token,
+  });
+}
+
+export function apiAdminAllTestimonials(token: string, approved?: boolean) {
+  const params = approved !== undefined ? `?approved=${approved}` : "";
+  return request<{ testimonials: TestimonialData[] }>(`/api/admin/testimonials${params}`, { token });
+}
+
+export function apiAdminApproveTestimonial(token: string, id: string, isApproved: boolean) {
+  return request<{ testimonial: TestimonialData }>(`/api/admin/testimonials/${id}/approve`, {
+    method: "PATCH",
+    body: { is_approved: isApproved },
+    token,
+  });
+}
+
+export function apiAdminDeleteTestimonial(token: string, id: string) {
+  return request<{ success: boolean }>(`/api/admin/testimonials/${id}`, {
+    method: "DELETE",
+    token,
   });
 }

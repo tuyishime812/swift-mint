@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL DEFAULT '',
   firebase_uid TEXT,
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  token_version INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -92,6 +93,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_bill_payments_reference_unique ON bill_pay
 CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_idempotency_unique
   ON transactions(user_id, type, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
+
+-- Testimonials table
+CREATE TABLE IF NOT EXISTS testimonials (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  location TEXT NOT NULL DEFAULT '',
+  text TEXT NOT NULL,
+  stars INTEGER NOT NULL DEFAULT 5 CHECK (stars >= 1 AND stars <= 5),
+  is_approved BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_testimonials_approved ON testimonials(is_approved, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bill_payments_idempotency_unique
   ON bill_payments(user_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
@@ -335,7 +350,18 @@ BEGIN
     'Manual funding by admin ' || p_admin_id::TEXT,
     p_reference, p_idempotency_key, NOW(), NOW()
   )
+  ON CONFLICT (user_id, type, idempotency_key) WHERE idempotency_key IS NOT NULL
+  DO NOTHING
   RETURNING * INTO v_txn;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object(
+      'success', true,
+      'reference', p_reference,
+      'new_balance', v_wallet.balance,
+      'replayed', true
+    );
+  END IF;
 
   RETURN jsonb_build_object(
     'success', true,

@@ -10,11 +10,13 @@ import {
   Clock3,
   Globe2,
   Loader2,
+  MessageCircle,
   Plus,
   Save,
   Search,
   Settings,
   ShieldCheck,
+  Star,
   Trash2,
   Users,
   Wallet,
@@ -25,12 +27,16 @@ import { ShieldAlert } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   type TransactionData,
+  type TestimonialData,
   apiAdminAllTransactions,
   apiAdminAllUsers,
   apiAdminUpdateTransactionStatus,
   apiAdminDeleteTransaction,
   apiAdminUsersWithBalance,
   apiAdminFundUser,
+  apiAdminAllTestimonials,
+  apiAdminApproveTestimonial,
+  apiAdminDeleteTestimonial,
 } from "@/lib/api";
 import {
   getSettings,
@@ -67,7 +73,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   cancelled: { label: "Cancelled", className: "badge-cancelled" },
 };
 
-type Tab = "transactions" | "users" | "settings";
+type Tab = "transactions" | "users" | "testimonials" | "settings";
 
 export function AdminClient() {
   const { user, token, loading: authLoading, isAdmin } = useAuth();
@@ -76,7 +82,10 @@ export function AdminClient() {
   const [tab, setTab] = useState<Tab>("transactions");
   const [allTxns, setAllTxns] = useState<TransactionData[]>([]);
   const [allUsers, setAllUsers] = useState<({ id: string; name: string; phone?: string; email: string; created_at: string } & { balance?: number })[]>([]);
+  const [allTestimonials, setAllTestimonials] = useState<TestimonialData[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [fundError, setFundError] = useState("");
+  const [actionError, setActionError] = useState("");
 
   // Filters
   const [search, setSearch] = useState("");
@@ -96,12 +105,14 @@ export function AdminClient() {
   const fetchData = useCallback(async () => {
     if (!token) return;
     try {
-      const [txnRes, userRes] = await Promise.all([
+      const [txnRes, userRes, testimonialRes] = await Promise.all([
         apiAdminAllTransactions(token, { limit: 200 }),
         apiAdminUsersWithBalance(token, { limit: 200 }).catch(() => apiAdminAllUsers(token, { limit: 200 })),
+        apiAdminAllTestimonials(token).catch(() => ({ testimonials: [] })),
       ]);
       setAllTxns(txnRes.transactions);
       setAllUsers(userRes.users);
+      setAllTestimonials(testimonialRes.testimonials);
     } catch {
       // ignore
     } finally {
@@ -115,22 +126,29 @@ export function AdminClient() {
 
   async function handleUpdateStatus(txnId: string, status: string) {
     if (!token) return;
+    setActionError("");
     try {
       await apiAdminUpdateTransactionStatus(token, txnId, status);
       await fetchData();
-    } catch { /* ignore */ }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to update status");
+    }
   }
 
   async function handleDelete(txnId: string) {
     if (!token || !confirm("Delete this transaction permanently?")) return;
+    setActionError("");
     try {
       await apiAdminDeleteTransaction(token, txnId);
       await fetchData();
-    } catch { /* ignore */ }
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to delete");
+    }
   }
 
   async function handleFundUser(e: React.FormEvent) {
     e.preventDefault();
+    setFundError("");
     const amount = Number(fundAmount);
     if (!amount || amount <= 0 || !fundUserId || !token) return;
     setFunding(true);
@@ -139,7 +157,9 @@ export function AdminClient() {
       setFundUserId("");
       setFundAmount("");
       await fetchData();
-    } catch { /* ignore */ }
+    } catch (err) {
+      setFundError(err instanceof Error ? err.message : "Funding failed");
+    }
     finally { setFunding(false); }
   }
 
@@ -276,11 +296,11 @@ export function AdminClient() {
         </div>
 
         <div className="dash-actions">
-          {(["transactions", "users", "settings"] as Tab[]).map((t) => (
+          {(["transactions", "users", "testimonials", "settings"] as Tab[]).map((t) => (
             <button key={t}
               className={`button ${tab === t ? "button-primary" : "button-secondary"}`}
               type="button" onClick={() => setTab(t)}>
-              {t === "transactions" ? <Wallet size={17} /> : t === "users" ? <Users size={17} /> : <Settings size={17} />}
+              {t === "transactions" ? <Wallet size={17} /> : t === "users" ? <Users size={17} /> : t === "testimonials" ? <Star size={17} /> : <Settings size={17} />}
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
@@ -289,6 +309,7 @@ export function AdminClient() {
         {tab === "transactions" && (
           <>
             <div className="dash-controls">
+              {actionError ? <div className="form-error" style={{ marginBottom: 8 }}>{actionError}</div> : null}
               <div className="dash-search">
                 <Search size={16} />
                 <input type="text" placeholder="Search..."
@@ -413,6 +434,7 @@ export function AdminClient() {
             <div className="dash-controls">
               <span className="dash-count">{allUsers.length} user{allUsers.length !== 1 ? "s" : ""}</span>
             </div>
+            {fundError ? <div className="form-error">{fundError}</div> : null}
             <div className="dash-table-wrap">
               <table className="dash-table">
                 <thead>
@@ -444,14 +466,14 @@ export function AdminClient() {
                               {funding ? <Loader2 className="spin" size={14} /> : "Add"}
                             </button>
                             <button className="button button-secondary" type="button"
-                              onClick={() => { setFundUserId(""); setFundAmount(""); }}
+                              onClick={() => { setFundUserId(""); setFundAmount(""); setFundError(""); }}
                               style={{ minHeight: 32, fontSize: "0.8rem", padding: "0 10px" }}>
                               <X size={14} />
                             </button>
                           </form>
                         ) : (
                           <button className="dash-action-btn" title="Fund wallet"
-                            onClick={() => setFundUserId(u.id)}>
+                            onClick={() => { setFundUserId(u.id); setFundError(""); }}>
                             <Banknote size={14} />
                           </button>
                         )}
@@ -461,6 +483,107 @@ export function AdminClient() {
                 </tbody>
               </table>
             </div>
+          </>
+        )}
+
+        {tab === "testimonials" && (
+          <>
+            <div className="dash-controls">
+              <span className="dash-count">{allTestimonials.length} testimonial{allTestimonials.length !== 1 ? "s" : ""}</span>
+            </div>
+            {actionError ? <div className="form-error" style={{ margin: "8px 0" }}>{actionError}</div> : null}
+            {allTestimonials.length === 0 ? (
+              <div className="dash-empty">
+                <MessageCircle size={40} />
+                <strong>No testimonials yet</strong>
+                <p>Testimonials submitted by users will appear here for moderation.</p>
+              </div>
+            ) : (
+              <div className="dash-table-wrap">
+                <table className="dash-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Location</th>
+                      <th>Text</th>
+                      <th>Stars</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allTestimonials.map((t) => (
+                      <tr key={t.id}>
+                        <td><strong>{t.name}</strong></td>
+                        <td>{t.location || "—"}</td>
+                        <td className="dash-desc" style={{ maxWidth: 300 }}>{t.text}</td>
+                        <td>
+                          <span style={{ display: "inline-flex", gap: 2, color: "var(--accent)" }}>
+                            {Array.from({ length: t.stars }, (_, i) => (
+                              <Star key={i} size={13} fill="var(--accent)" />
+                            ))}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`dash-badge ${t.is_approved ? "badge-completed" : "badge-pending"}`}>
+                            {t.is_approved ? "Approved" : "Pending"}
+                          </span>
+                        </td>
+                        <td>{formatDate(t.created_at)}</td>
+                        <td>
+                          <div className="dash-row-actions">
+                            {!t.is_approved ? (
+                              <button className="dash-action-btn dash-action-complete" title="Approve"
+                                onClick={async () => {
+                                  if (!token) return;
+                                  setActionError("");
+                                  try {
+                                    await apiAdminApproveTestimonial(token, t.id, true);
+                                    await fetchData();
+                                  } catch (err) {
+                                    setActionError(err instanceof Error ? err.message : "Failed to approve");
+                                  }
+                                }}>
+                                <CheckCircle2 size={14} /> Approve
+                              </button>
+                            ) : (
+                              <button className="dash-action-btn" title="Unapprove"
+                                onClick={async () => {
+                                  if (!token) return;
+                                  setActionError("");
+                                  try {
+                                    await apiAdminApproveTestimonial(token, t.id, false);
+                                    await fetchData();
+                                  } catch (err) {
+                                    setActionError(err instanceof Error ? err.message : "Failed to unapprove");
+                                  }
+                                }}>
+                                <XCircle size={14} /> Unapprove
+                              </button>
+                            )}
+                            <button className="dash-action-btn dash-action-danger" title="Delete"
+                              onClick={async () => {
+                                if (!token) return;
+                                if (!confirm("Delete this testimonial?")) return;
+                                setActionError("");
+                                try {
+                                  await apiAdminDeleteTestimonial(token, t.id);
+                                  await fetchData();
+                                } catch (err) {
+                                  setActionError(err instanceof Error ? err.message : "Failed to delete");
+                                }
+                              }}>
+                              <Trash2 size={14} /> Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </>
         )}
 

@@ -2,12 +2,13 @@ from fastapi import APIRouter, HTTPException, Depends, Header
 from datetime import datetime, timedelta
 from typing import Optional
 from dotenv import load_dotenv
+from uuid import uuid4
 import os
 
 from jose import jwt, JWTError
 from passlib.hash import bcrypt
 
-from models import SignupRequest, LoginRequest, UserResponse
+from models import SignupRequest, LoginRequest, UserResponse, SupabaseLogin
 from database import supabase
 
 load_dotenv()
@@ -19,19 +20,23 @@ if not SECRET_KEY:
     raise RuntimeError("APP_SECRET is required")
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 7
+ACCESS_TOKEN_EXPIRE_HOURS = 1
 
 
-def create_token(user_id: str) -> str:
+def create_token(user_id: str, token_version: int = 0) -> str:
     payload = {
         "sub": user_id,
+        "tkn_v": token_version,
+        "jti": uuid4().hex,
         "iat": datetime.utcnow(),
-        "exp": datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS),
+        "exp": datetime.utcnow() + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def get_current_user(authorization: str = Header(...)) -> dict:
+def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing authorization header")
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
@@ -39,13 +44,19 @@ def get_current_user(authorization: str = Header(...)) -> dict:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
+        tkn_v = payload.get("tkn_v", 0)
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
     result = supabase.table("users").select("*").eq("id", user_id).execute()
     if not result.data:
         raise HTTPException(status_code=401, detail="User not found")
-    return result.data[0]
+
+    user = result.data[0]
+    if user.get("token_version", 0) != tkn_v:
+        raise HTTPException(status_code=401, detail="Token revoked. Please log in again.")
+
+    return user
 
 
 def _format_user(user: dict) -> dict:
@@ -107,9 +118,11 @@ def signup(data: SignupRequest):
 
 @router.post("/login")
 def login(data: LoginRequest):
-    result = supabase.table("users").select("*").or_(
-        f"email.eq.{data.email_or_username},username.eq.{data.email_or_username}"
-    ).execute()
+    email = data.email_or_username.strip().lower()
+
+    result = supabase.table("users").select("*").eq("email", email).execute()
+    if not result.data:
+        result = supabase.table("users").select("*").eq("username", email).execute()
 
     if not result.data:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -119,22 +132,20 @@ def login(data: LoginRequest):
     if not user.get("password_hash") or not bcrypt.verify(data.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = create_token(user["id"])
+    token = create_token(user["id"], user.get("token_version", 0))
 
     return {"token": token, "user": _format_user(user)}
 
 
 @router.post("/supabase")
-def supabase_login(data: dict):
-    access_token = data.get("access_token")
-    if not access_token:
-        raise HTTPException(status_code=400, detail="Missing access token")
+def supabase_login(data: SupabaseLogin):
+    access_token = data.access_token
 
     try:
         user_data = supabase.auth.get_user(access_token)
         google_user = user_data.user
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Invalid Supabase token: {str(e)}")
+        raise HTTPException(status_code=401, detail="Invalid Supabase token")
 
     google_id = google_user.id
     email = google_user.email or f"{google_id}@swiftmint.mw"
@@ -171,7 +182,7 @@ def supabase_login(data: dict):
             "updated_at": now,
         }, on_conflict="user_id").execute()
 
-    local_token = create_token(user["id"])
+    local_token = create_token(user["id"], user.get("token_version", 0))
     wallet = supabase.table("wallets").select("balance").eq("user_id", user["id"]).execute()
     balance = wallet.data[0]["balance"] if wallet.data else 0
 

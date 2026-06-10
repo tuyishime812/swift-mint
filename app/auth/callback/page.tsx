@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabaseClient } from "@/lib/supabase";
 import { apiExchangeSupabaseToken } from "@/lib/api";
 
 const TOKEN_KEY = "swiftmint_token";
 
 export default function AuthCallbackPage() {
-  const router = useRouter();
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -21,12 +19,12 @@ export default function AuthCallbackPage() {
       try {
         const result = await apiExchangeSupabaseToken(session.access_token);
         localStorage.setItem(TOKEN_KEY, result.token);
-        router.push("/dashboard");
+        window.location.href = "/dashboard";
       } catch (err) {
         setError(err instanceof Error ? err.message : "Authentication failed.");
       }
     });
-  }, [router]);
+  }, []);
 
   if (error) {
     return (

@@ -57,7 +57,8 @@ export default function TransferPage() {
 
   useEffect(() => {
     if (!authLoading && !user) { router.push("/login"); return; }
-  }, [user, authLoading, router]);
+    if (user) refreshBalance();
+  }, [user, authLoading, router, refreshBalance]);
 
   const selectedCountryWallets = useMemo(
     () => dynamicCountries.find((c) => c.name === form.country)?.wallets ?? [],
@@ -76,7 +77,7 @@ export default function TransferPage() {
   );
 
   const fxRate = useMemo(
-    () => selectedCountry && fxRates ? getFxRate(fxRates, selectedCountry.currency) : 0,
+    () => selectedCountry?.currency && fxRates ? getFxRate(fxRates, selectedCountry.currency) : 0,
     [selectedCountry, fxRates],
   );
 

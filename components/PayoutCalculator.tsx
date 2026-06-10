@@ -4,8 +4,7 @@ import { useState } from "react";
 import { Calculator, Info } from "lucide-react";
 
 const STANDARD_FEE_RATE = 0.06;
-const VIP_FEE_RATE_LOW = 0.03;
-const VIP_FEE_RATE_HIGH = 0.04;
+const VIP_FEE_RATE = 0.035;
 const VIP_THRESHOLD = 300000;
 const MINIMUM_FEE = 5000;
 
@@ -25,10 +24,9 @@ export function PayoutCalculator() {
 
   if (isValid) {
     if (numAmount >= VIP_THRESHOLD) {
-      const rawFeeLow = numAmount * VIP_FEE_RATE_LOW;
-      const rawFeeHigh = numAmount * VIP_FEE_RATE_HIGH;
-      fee = Math.max(rawFeeLow, MINIMUM_FEE);
-      vipRate = `${(VIP_FEE_RATE_LOW * 100).toFixed(0)}-${(VIP_FEE_RATE_HIGH * 100).toFixed(0)}%`;
+      const rawFee = numAmount * VIP_FEE_RATE;
+      fee = Math.max(rawFee, MINIMUM_FEE);
+      vipRate = `${(VIP_FEE_RATE * 100).toFixed(1)}%`;
       isVip = true;
     } else {
       const rawFee = numAmount * STANDARD_FEE_RATE;

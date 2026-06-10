@@ -68,8 +68,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     storeToken(data.token);
     setToken(data.token);
     setUser(data.user);
-    const me = await apiGetMe(data.token);
-    setBalance(me.balance);
+    setBalance(0);
+    try {
+      const me = await apiGetMe(data.token);
+      setBalance(me.balance);
+    } catch {
+      // Balance fetch failed — user is still logged in, balance will show 0
+    }
   }, []);
 
   const signup = useCallback(async (name: string, email: string, phone: string, username: string, password: string) => {

@@ -21,12 +21,13 @@ import {
   XCircle,
 } from "lucide-react";
 import {
-  ShieldCheck,
+  ShieldCheck, Star,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   type TransactionData,
   apiGetTransactions,
+  apiCreateTestimonial,
 } from "@/lib/api";
 import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 import { getSettings } from "@/lib/settings";
@@ -184,14 +185,20 @@ export function DashboardClient() {
   const [statusFilter, setStatusFilter] = useState<"all" | string>("all");
   const [page, setPage] = useState(1);
   const [detailTxn, setDetailTxn] = useState<TransactionData | null>(null);
+  const [testimonialText, setTestimonialText] = useState("");
+  const [testimonialSubmitting, setTestimonialSubmitting] = useState(false);
+  const [testimonialDone, setTestimonialDone] = useState(false);
+  const [testimonialError, setTestimonialError] = useState("");
+  const [fetchError, setFetchError] = useState("");
 
   const fetchTransactions = useCallback(async () => {
     if (!token) return;
+    setFetchError("");
     try {
       const data = await apiGetTransactions(token);
       setAllTransactions(data.transactions);
-    } catch {
-      // ignore
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : "Failed to load transactions");
     } finally {
       setFetching(false);
     }
@@ -356,7 +363,16 @@ export function DashboardClient() {
           </div>
         </div>
 
-        {allTransactions.length === 0 ? (
+        {fetchError ? (
+          <div className="dash-empty" style={{ borderColor: "var(--danger)" }}>
+            <Smartphone size={40} />
+            <strong>Failed to load orders</strong>
+            <p>{fetchError}</p>
+            <button className="button button-primary" type="button" onClick={fetchTransactions}>
+              Try again
+            </button>
+          </div>
+        ) : allTransactions.length === 0 ? (
           <div className="dash-empty">
             <Smartphone size={40} />
             <strong>No orders yet</strong>
@@ -506,6 +522,74 @@ export function DashboardClient() {
             ) : null}
           </>
         )}
+      </section>
+
+      <section className="section" aria-labelledby="testimonial-title" style={{ paddingBottom: 0 }}>
+        <div className="section-heading">
+          <p className="eyebrow">Share your experience</p>
+          <h2 id="testimonial-title">Leave a testimonial</h2>
+          <p>Tell others what you think about SwiftMint. Your feedback helps us improve.</p>
+        </div>
+        <div style={{ maxWidth: 600, marginTop: 28 }}>
+          {testimonialDone ? (
+            <div className="form-success" style={{ padding: "16px 20px" }}>
+              <CheckCircle2 size={20} />
+              <span>Thank you! Your testimonial has been submitted and will appear once approved.</span>
+            </div>
+          ) : (
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!testimonialText.trim() || !token) return;
+              setTestimonialSubmitting(true);
+              setTestimonialError("");
+              try {
+                await apiCreateTestimonial(token, { text: testimonialText.trim() });
+                setTestimonialDone(true);
+                setTestimonialText("");
+              } catch (err) {
+                setTestimonialError(err instanceof Error ? err.message : "Submission failed");
+              } finally {
+                setTestimonialSubmitting(false);
+              }
+            }}>
+              {testimonialError ? <div className="form-error">{testimonialError}</div> : null}
+              <label style={{ display: "grid", gap: 8 }}>
+                <span style={{ fontSize: "0.88rem", fontWeight: 820 }}>Your testimonial</span>
+                <textarea
+                  required
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Share your experience with SwiftMint..."
+                  value={testimonialText}
+                  onChange={(e) => setTestimonialText(e.target.value)}
+                  style={{
+                    appearance: "none",
+                    background: "var(--surface-alt)",
+                    border: "1px solid var(--line)",
+                    borderRadius: 8,
+                    color: "var(--ink)",
+                    font: "inherit",
+                    minHeight: 80,
+                    outline: "none",
+                    padding: "12px 14px",
+                    resize: "vertical",
+                    width: "100%",
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = "var(--brand)"}
+                  onBlur={(e) => e.target.style.borderColor = "var(--line)"}
+                />
+              </label>
+              <div style={{ display: "flex", gap: 10, marginTop: 14, alignItems: "center" }}>
+                <button className="button button-primary" type="submit" disabled={testimonialSubmitting || !testimonialText.trim()}
+                  style={{ minHeight: 42, fontSize: "0.88rem" }}>
+                  {testimonialSubmitting ? <Loader2 className="spin" size={17} /> : <Star size={17} />}
+                  {testimonialSubmitting ? "Submitting..." : "Submit testimonial"}
+                </button>
+                <span style={{ color: "var(--muted)", fontSize: "0.82rem" }}>{testimonialText.length}/500</span>
+              </div>
+            </form>
+          )}
+        </div>
       </section>
 
       <section className="info-band" aria-labelledby="dash-help">

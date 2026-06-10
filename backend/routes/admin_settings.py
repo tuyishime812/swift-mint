@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from database import supabase
 from routes.admin_base import require_admin
+from models import AdminFundUser
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -26,8 +27,10 @@ def _raise_db_error(exc: Exception):
     message = str(exc)
     if "Wallet not found" in message:
         raise HTTPException(status_code=404, detail="Wallet not found")
-    if "duplicate key" in message or "idempotency" in message:
-        raise HTTPException(status_code=409, detail="Duplicate funding request")
+    if "duplicate key" in message:
+        raise HTTPException(status_code=409, detail="This funding request was already processed (duplicate). If this is a mistake, try again with a different amount.")
+    if "idempotency" in message:
+        raise HTTPException(status_code=409, detail="This funding request was already processed. Refresh the page and try again.")
     raise HTTPException(status_code=500, detail="Funding could not be processed")
 
 
@@ -56,14 +59,10 @@ def admin_users_with_balance(
 
 @router.post("/fund-user")
 def admin_fund_user(
-    body: dict,
+    body: AdminFundUser,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     admin: dict = Depends(require_admin),
 ):
-    user_id = body.get("user_id")
-    amount = body.get("amount", 0)
-    if not user_id or amount <= 0:
-        raise HTTPException(status_code=400, detail="User ID and positive amount required")
     if idempotency_key and len(idempotency_key) > 128:
         raise HTTPException(status_code=400, detail="Idempotency-Key is too long")
 
@@ -71,9 +70,9 @@ def admin_fund_user(
         result = supabase.rpc(
             "credit_wallet_by_admin",
             {
-                "p_user_id": user_id,
+                "p_user_id": body.user_id,
                 "p_admin_id": admin["id"],
-                "p_amount": int(amount),
+                "p_amount": body.amount,
                 "p_reference": _generate_ref(),
                 "p_idempotency_key": idempotency_key,
             },

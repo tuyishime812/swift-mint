@@ -4,6 +4,7 @@ from datetime import datetime
 from database import supabase
 from routes.auth import get_current_user
 from routes.admin_base import require_admin
+from models import UpdateTransactionStatus
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -37,8 +38,8 @@ def admin_list_users(
 
 
 @router.patch("/transactions/{txn_id}/status")
-def admin_update_status(txn_id: str, body: dict, admin: dict = Depends(require_admin)):
-    status = body.get("status")
+def admin_update_status(txn_id: str, body: UpdateTransactionStatus, admin: dict = Depends(require_admin)):
+    status = body.status.value
     valid_statuses = ["pending", "confirmed", "processing", "completed", "cancelled"]
     if status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
