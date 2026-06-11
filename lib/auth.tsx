@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { supabaseClient } from "./supabase";
-import { apiGetMe, apiLogin, apiSignup, apiExchangeSupabaseToken, type UserData } from "./api";
+import { getSupabaseClient, isSupabaseConfigured } from "./supabase";
+import { AUTH_EXPIRED_EVENT, apiGetMe, apiLogin, apiSignup, type UserData } from "./api";
 
 type AuthContext = {
   user: UserData | null;
@@ -57,10 +57,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
       clearToken();
       setToken(null);
+      setUser(null);
+      setBalance(0);
     }).finally(() => {
       if (!cancelled) setLoading(false);
     });
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    function handleAuthExpired() {
+      clearToken();
+      setToken(null);
+      setUser(null);
+      setBalance(0);
+    }
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
   }, []);
 
   const login = useCallback(async (email_or_username: string, password: string) => {
@@ -86,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleGoogleAuth = useCallback(async () => {
-    const { error } = await supabaseClient.auth.signInWithOAuth({
+    const { error } = await getSupabaseClient().auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
@@ -108,7 +122,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null);
     setUser(null);
     setBalance(0);
-    supabaseClient.auth.signOut();
+    try {
+      if (isSupabaseConfigured()) {
+        void getSupabaseClient().auth.signOut();
+      }
+    } catch {
+      // Local logout should still succeed if Google auth config is invalid.
+    }
   }, []);
 
   const refreshBalance = useCallback(async () => {

@@ -8,9 +8,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE IF NOT EXISTS users (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL DEFAULT '',
-  username TEXT NOT NULL DEFAULT '',
-  phone TEXT NOT NULL DEFAULT '',
-  email TEXT NOT NULL DEFAULT '',
+  username TEXT NOT NULL DEFAULT '' CHECK (username = LOWER(BTRIM(username))),
+  phone TEXT NOT NULL DEFAULT '' CHECK (phone = BTRIM(phone)),
+  email TEXT NOT NULL DEFAULT '' CHECK (email = LOWER(BTRIM(email))),
   password_hash TEXT NOT NULL DEFAULT '',
   firebase_uid TEXT,
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
@@ -21,6 +21,9 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone) WHERE phone != '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_normalized ON users(LOWER(BTRIM(email)));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_normalized ON users(LOWER(BTRIM(username)));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebase_uid_unique ON users(firebase_uid) WHERE firebase_uid IS NOT NULL AND firebase_uid != '';
 CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
 
 -- To make a user an admin, run:
@@ -93,6 +96,76 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_bill_payments_reference_unique ON bill_pay
 CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_idempotency_unique
   ON transactions(user_id, type, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION create_user_with_wallet(
+  p_name TEXT,
+  p_email TEXT,
+  p_username TEXT,
+  p_phone TEXT,
+  p_password_hash TEXT,
+  p_firebase_uid TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+  id UUID,
+  name TEXT,
+  username TEXT,
+  phone TEXT,
+  email TEXT,
+  password_hash TEXT,
+  firebase_uid TEXT,
+  is_admin BOOLEAN,
+  token_version INTEGER,
+  created_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH inserted_user AS (
+    INSERT INTO users (
+      name,
+      phone,
+      email,
+      username,
+      password_hash,
+      firebase_uid,
+      is_admin,
+      created_at
+    )
+    VALUES (
+      COALESCE(NULLIF(BTRIM(p_name), ''), 'User'),
+      COALESCE(BTRIM(p_phone), ''),
+      LOWER(BTRIM(p_email)),
+      LOWER(BTRIM(p_username)),
+      COALESCE(p_password_hash, ''),
+      p_firebase_uid,
+      FALSE,
+      NOW()
+    )
+    RETURNING users.*
+  ),
+  inserted_wallet AS (
+    INSERT INTO wallets (user_id, balance, created_at, updated_at)
+    SELECT inserted_user.id, 0, NOW(), NOW()
+    FROM inserted_user
+    ON CONFLICT (user_id) DO NOTHING
+  )
+  SELECT
+    inserted_user.id,
+    inserted_user.name,
+    inserted_user.username,
+    inserted_user.phone,
+    inserted_user.email,
+    inserted_user.password_hash,
+    inserted_user.firebase_uid,
+    inserted_user.is_admin,
+    inserted_user.token_version,
+    inserted_user.created_at
+  FROM inserted_user;
+END;
+$$;
 
 -- Testimonials table
 CREATE TABLE IF NOT EXISTS testimonials (
@@ -335,12 +408,6 @@ BEGIN
     RAISE EXCEPTION 'Wallet not found' USING ERRCODE = 'P0002';
   END IF;
 
-  UPDATE wallets
-  SET balance = balance + p_amount,
-      updated_at = NOW()
-  WHERE id = v_wallet.id
-  RETURNING * INTO v_wallet;
-
   INSERT INTO transactions (
     user_id, type, status, amount, fee, payout, currency, description,
     reference, idempotency_key, created_at, updated_at
@@ -355,13 +422,25 @@ BEGIN
   RETURNING * INTO v_txn;
 
   IF NOT FOUND THEN
+    SELECT * INTO v_txn
+    FROM transactions
+    WHERE user_id = p_user_id
+      AND type = 'fund'
+      AND idempotency_key = p_idempotency_key;
+
     RETURN jsonb_build_object(
       'success', true,
-      'reference', p_reference,
+      'reference', COALESCE(v_txn.reference, p_reference),
       'new_balance', v_wallet.balance,
       'replayed', true
     );
   END IF;
+
+  UPDATE wallets
+  SET balance = balance + p_amount,
+      updated_at = NOW()
+  WHERE id = v_wallet.id
+  RETURNING * INTO v_wallet;
 
   RETURN jsonb_build_object(
     'success', true,

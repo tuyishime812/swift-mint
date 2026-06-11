@@ -8,12 +8,64 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FAL
 ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_uid TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0;
 
-UPDATE users SET username = name WHERE username = '';
+-- Before running this migration, these audit queries should return no rows.
+-- Resolve any returned duplicates manually, then re-run the migration.
+-- SELECT LOWER(BTRIM(email)) AS email, COUNT(*) FROM users GROUP BY 1 HAVING COUNT(*) > 1;
+-- SELECT LOWER(BTRIM(username)) AS username, COUNT(*) FROM users WHERE username != '' GROUP BY 1 HAVING COUNT(*) > 1;
+-- SELECT BTRIM(phone) AS phone, COUNT(*) FROM users WHERE BTRIM(phone) != '' GROUP BY 1 HAVING COUNT(*) > 1;
+-- SELECT firebase_uid, COUNT(*) FROM users WHERE firebase_uid IS NOT NULL AND firebase_uid != '' GROUP BY 1 HAVING COUNT(*) > 1;
+
+UPDATE users
+SET username = COALESCE(
+  NULLIF(TRIM(BOTH '-' FROM REGEXP_REPLACE(LOWER(BTRIM(name)), '[^a-z0-9_.-]+', '-', 'g')), ''),
+  'user-' || LEFT(id::TEXT, 8)
+)
+WHERE username = '';
+
+UPDATE users
+SET
+  email = LOWER(BTRIM(email)),
+  username = COALESCE(
+    NULLIF(TRIM(BOTH '-' FROM REGEXP_REPLACE(LOWER(BTRIM(username)), '[^a-z0-9_.-]+', '-', 'g')), ''),
+    'user-' || LEFT(id::TEXT, 8)
+  ),
+  phone = BTRIM(phone);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone) WHERE phone != '';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_normalized ON users(LOWER(BTRIM(email)));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username_normalized ON users(LOWER(BTRIM(username)));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebase_uid_unique ON users(firebase_uid) WHERE firebase_uid IS NOT NULL AND firebase_uid != '';
 CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'users_email_normalized_check'
+  ) THEN
+    ALTER TABLE users
+      ADD CONSTRAINT users_email_normalized_check
+      CHECK (email = LOWER(BTRIM(email))) NOT VALID;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'users_username_normalized_check'
+  ) THEN
+    ALTER TABLE users
+      ADD CONSTRAINT users_username_normalized_check
+      CHECK (username = LOWER(BTRIM(username))) NOT VALID;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'users_phone_trimmed_check'
+  ) THEN
+    ALTER TABLE users
+      ADD CONSTRAINT users_phone_trimmed_check
+      CHECK (phone = BTRIM(phone)) NOT VALID;
+  END IF;
+END;
+$$;
 
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
 ALTER TABLE bill_payments ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
@@ -34,6 +86,76 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_idempotency_unique
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bill_payments_idempotency_unique
   ON bill_payments(user_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION create_user_with_wallet(
+  p_name TEXT,
+  p_email TEXT,
+  p_username TEXT,
+  p_phone TEXT,
+  p_password_hash TEXT,
+  p_firebase_uid TEXT DEFAULT NULL
+)
+RETURNS TABLE (
+  id UUID,
+  name TEXT,
+  username TEXT,
+  phone TEXT,
+  email TEXT,
+  password_hash TEXT,
+  firebase_uid TEXT,
+  is_admin BOOLEAN,
+  token_version INTEGER,
+  created_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  WITH inserted_user AS (
+    INSERT INTO users (
+      name,
+      phone,
+      email,
+      username,
+      password_hash,
+      firebase_uid,
+      is_admin,
+      created_at
+    )
+    VALUES (
+      COALESCE(NULLIF(BTRIM(p_name), ''), 'User'),
+      COALESCE(BTRIM(p_phone), ''),
+      LOWER(BTRIM(p_email)),
+      LOWER(BTRIM(p_username)),
+      COALESCE(p_password_hash, ''),
+      p_firebase_uid,
+      FALSE,
+      NOW()
+    )
+    RETURNING users.*
+  ),
+  inserted_wallet AS (
+    INSERT INTO wallets (user_id, balance, created_at, updated_at)
+    SELECT inserted_user.id, 0, NOW(), NOW()
+    FROM inserted_user
+    ON CONFLICT (user_id) DO NOTHING
+  )
+  SELECT
+    inserted_user.id,
+    inserted_user.name,
+    inserted_user.username,
+    inserted_user.phone,
+    inserted_user.email,
+    inserted_user.password_hash,
+    inserted_user.firebase_uid,
+    inserted_user.is_admin,
+    inserted_user.token_version,
+    inserted_user.created_at
+  FROM inserted_user;
+END;
+$$;
 
 -- Fix race condition in credit_wallet_by_admin: use ON CONFLICT DO NOTHING
 CREATE OR REPLACE FUNCTION credit_wallet_by_admin(
@@ -79,12 +201,6 @@ BEGIN
     RAISE EXCEPTION 'Wallet not found' USING ERRCODE = 'P0002';
   END IF;
 
-  UPDATE wallets
-  SET balance = balance + p_amount,
-      updated_at = NOW()
-  WHERE id = v_wallet.id
-  RETURNING * INTO v_wallet;
-
   INSERT INTO transactions (
     user_id, type, status, amount, fee, payout, currency, description,
     reference, idempotency_key, created_at, updated_at
@@ -99,13 +215,25 @@ BEGIN
   RETURNING * INTO v_txn;
 
   IF NOT FOUND THEN
+    SELECT * INTO v_txn
+    FROM transactions
+    WHERE user_id = p_user_id
+      AND type = 'fund'
+      AND idempotency_key = p_idempotency_key;
+
     RETURN jsonb_build_object(
       'success', true,
-      'reference', p_reference,
+      'reference', COALESCE(v_txn.reference, p_reference),
       'new_balance', v_wallet.balance,
       'replayed', true
     );
   END IF;
+
+  UPDATE wallets
+  SET balance = balance + p_amount,
+      updated_at = NOW()
+  WHERE id = v_wallet.id
+  RETURNING * INTO v_wallet;
 
   RETURN jsonb_build_object(
     'success', true,

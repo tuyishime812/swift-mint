@@ -1,4 +1,7 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const configuredApiBase = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/+$/, "") || "";
+const API_BASE = configuredApiBase || (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
+
+export const AUTH_EXPIRED_EVENT = "swiftmint:auth-expired";
 
 type ApiOptions = {
   method?: string;
@@ -7,6 +10,54 @@ type ApiOptions = {
   idempotencyKey?: string;
 };
 
+function getApiBase(): string {
+  if (API_BASE) return API_BASE;
+  throw new Error("SwiftMint API URL is not configured.");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+async function parseResponseBody(res: Response): Promise<unknown> {
+  if (res.status === 204) return null;
+
+  const contentType = res.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
+
+  const text = await res.text();
+  return text || null;
+}
+
+function validationMessage(detail: unknown): string | null {
+  if (!Array.isArray(detail)) return null;
+  return detail
+    .map((entry) => {
+      if (isRecord(entry) && typeof entry.msg === "string") return entry.msg;
+      return JSON.stringify(entry);
+    })
+    .join("; ");
+}
+
+function responseErrorMessage(data: unknown, status: number): string {
+  if (isRecord(data)) {
+    const detail = data.detail;
+    const validation = validationMessage(detail);
+    if (validation) return validation;
+    if (typeof detail === "string" && detail.trim()) return detail;
+    if (typeof data.message === "string" && data.message.trim()) return data.message;
+  }
+
+  if (typeof data === "string" && data.trim()) return data;
+  return `Request failed (${status})`;
+}
+
 async function request<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -14,18 +65,27 @@ async function request<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   if (opts.token) headers["Authorization"] = `Bearer ${opts.token}`;
   if (opts.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: opts.method || "GET",
-    headers,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${getApiBase()}${path}`, {
+      method: opts.method || "GET",
+      headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("API URL is not configured")) {
+      throw err;
+    }
+    throw new Error("Unable to reach SwiftMint API. Please try again.");
+  }
 
-  const data = await res.json();
+  const data = await parseResponseBody(res);
 
   if (!res.ok) {
-    const msg = Array.isArray(data.detail)
-      ? data.detail.map((e: { msg?: string }) => e.msg || JSON.stringify(e)).join("; ")
-      : data.detail || `Request failed (${res.status})`;
+    const msg = responseErrorMessage(data, res.status);
+    if (res.status === 401 && opts.token && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+    }
     throw new Error(msg);
   }
 

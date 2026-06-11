@@ -1,7 +1,22 @@
-from pydantic import BaseModel, Field
+import re
+
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from enum import Enum
 from datetime import datetime
+
+EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
+
+
+def _strip(value: object) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _normalize_identity(value: object) -> str:
+    return _strip(value).lower()
 
 
 class TransactionType(str, Enum):
@@ -22,15 +37,44 @@ class TransactionStatus(str, Enum):
 
 class SignupRequest(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    email: str = Field(max_length=255)
-    phone: str = Field(max_length=20)
+    email: str = Field(min_length=3, max_length=255)
+    phone: str = Field(min_length=1, max_length=32)
     username: str = Field(min_length=1, max_length=50)
     password: str = Field(min_length=6, max_length=128)
 
+    @field_validator("name", "phone", mode="before")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        return _strip(value)
+
+    @field_validator("email", "username", mode="before")
+    @classmethod
+    def normalize_identity(cls, value: str) -> str:
+        return _normalize_identity(value)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        if not EMAIL_RE.match(value):
+            raise ValueError("Enter a valid email address")
+        return value
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        if not USERNAME_RE.match(value):
+            raise ValueError("Username may contain lowercase letters, numbers, dots, underscores, and hyphens")
+        return value
+
 
 class LoginRequest(BaseModel):
-    email_or_username: str = Field(max_length=255)
-    password: str = Field(max_length=128)
+    email_or_username: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=1, max_length=128)
+
+    @field_validator("email_or_username", mode="before")
+    @classmethod
+    def normalize_identifier(cls, value: str) -> str:
+        return _normalize_identity(value)
 
 
 class UserResponse(BaseModel):

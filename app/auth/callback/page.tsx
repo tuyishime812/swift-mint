@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabaseClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import { apiExchangeSupabaseToken } from "@/lib/api";
 
 const TOKEN_KEY = "swiftmint_token";
@@ -10,20 +10,23 @@ export default function AuthCallbackPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    supabaseClient.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session?.access_token) {
-        setError("No session found. Please try again.");
-        return;
-      }
-
+    async function completeAuth() {
       try {
+        const { data: { session } } = await getSupabaseClient().auth.getSession();
+        if (!session?.access_token) {
+          setError("No session found. Please try again.");
+          return;
+        }
+
         const result = await apiExchangeSupabaseToken(session.access_token);
         localStorage.setItem(TOKEN_KEY, result.token);
         window.location.href = "/dashboard";
       } catch (err) {
         setError(err instanceof Error ? err.message : "Authentication failed.");
       }
-    });
+    }
+
+    completeAuth();
   }, []);
 
   if (error) {

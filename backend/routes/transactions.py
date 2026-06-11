@@ -4,8 +4,8 @@ from uuid import uuid4
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 
 from database import supabase
-from email_service import send_order_placed_email, send_transaction_completed_email
-from models import PayBill, SendMoney, UpdateTransactionStatus, SendMoneyResponse, PayBillResponse
+from email_service import send_order_placed_email
+from models import PayBill, SendMoney, SendMoneyResponse, PayBillResponse
 from routes.auth import get_current_user
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
@@ -154,44 +154,11 @@ def pay_bill(
 @router.patch("/{txn_id}/status", response_model=dict)
 def update_transaction_status(
     txn_id: str,
-    body: UpdateTransactionStatus,
-    background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user),
 ):
-    status = body.status.value
-    valid_statuses = ["pending", "confirmed", "processing", "completed", "cancelled"]
-    if status not in valid_statuses:
-        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
-
-    result = supabase.table("transactions").select("*").eq("id", txn_id).eq("user_id", user["id"]).execute()
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-
-    supabase.table("transactions").update({
-        "status": status,
-        "updated_at": datetime.utcnow().isoformat(),
-    }).eq("id", txn_id).execute()
-
-    if status == "completed":
-        txn = result.data[0]
-        background_tasks.add_task(
-            send_transaction_completed_email,
-            user_email=user["email"],
-            user_name=user["name"],
-            recipient_name=txn.get("recipient_name", ""),
-            country=txn.get("country", ""),
-            amount=txn["amount"],
-            reference=txn["reference"],
-        )
-
-    return {"success": True, "status": status}
+    raise HTTPException(status_code=403, detail="Only admins can update transaction status")
 
 
 @router.delete("/{txn_id}", response_model=dict)
 def delete_transaction(txn_id: str, user: dict = Depends(get_current_user)):
-    result = supabase.table("transactions").select("*").eq("id", txn_id).eq("user_id", user["id"]).execute()
-    if not result.data:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-
-    supabase.table("transactions").delete().eq("id", txn_id).execute()
-    return {"success": True}
+    raise HTTPException(status_code=403, detail="Only admins can delete transactions")

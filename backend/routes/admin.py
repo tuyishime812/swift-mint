@@ -1,8 +1,8 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, Query
 from datetime import datetime
 
 from database import supabase
-from routes.auth import get_current_user
+from email_service import send_transaction_completed_email
 from routes.admin_base import require_admin
 from models import UpdateTransactionStatus
 
@@ -38,7 +38,12 @@ def admin_list_users(
 
 
 @router.patch("/transactions/{txn_id}/status")
-def admin_update_status(txn_id: str, body: UpdateTransactionStatus, admin: dict = Depends(require_admin)):
+def admin_update_status(
+    txn_id: str,
+    body: UpdateTransactionStatus,
+    background_tasks: BackgroundTasks,
+    admin: dict = Depends(require_admin),
+):
     status = body.status.value
     valid_statuses = ["pending", "confirmed", "processing", "completed", "cancelled"]
     if status not in valid_statuses:
@@ -48,10 +53,27 @@ def admin_update_status(txn_id: str, body: UpdateTransactionStatus, admin: dict 
     if not result.data:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
+    txn = result.data[0]
+    previous_status = txn.get("status")
+
     supabase.table("transactions").update({
         "status": status,
         "updated_at": datetime.utcnow().isoformat(),
     }).eq("id", txn_id).execute()
+
+    if status == "completed" and previous_status != "completed":
+        user_result = supabase.table("users").select("email, name").eq("id", txn["user_id"]).execute()
+        if user_result.data:
+            txn_user = user_result.data[0]
+            background_tasks.add_task(
+                send_transaction_completed_email,
+                user_email=txn_user["email"],
+                user_name=txn_user["name"],
+                recipient_name=txn.get("recipient_name", ""),
+                country=txn.get("country", ""),
+                amount=txn["amount"],
+                reference=txn["reference"],
+            )
 
     return {"success": True, "status": status}
 
