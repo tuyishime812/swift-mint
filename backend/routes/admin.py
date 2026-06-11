@@ -9,6 +9,22 @@ from models import UpdateTransactionStatus
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
+def _credit_wallet(user_id: str, amount: int):
+    wallet = supabase.table("wallets").select("id, balance").eq("user_id", user_id).limit(1).execute()
+    if not wallet.data:
+        supabase.table("wallets").insert({
+            "user_id": user_id,
+            "balance": amount,
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
+        }).execute()
+        return
+    supabase.table("wallets").update({
+        "balance": wallet.data[0]["balance"] + amount,
+        "updated_at": datetime.utcnow().isoformat(),
+    }).eq("id", wallet.data[0]["id"]).execute()
+
+
 @router.get("/transactions")
 def admin_list_transactions(
     limit: int = Query(100, ge=1, le=200),
@@ -56,12 +72,16 @@ def admin_update_status(
     txn = result.data[0]
     previous_status = txn.get("status")
 
+    # Credit wallet when a fund transaction is completed
+    if status == "completed" and previous_status != "completed" and txn.get("type") == "fund":
+        _credit_wallet(txn["user_id"], txn["amount"])
+
     supabase.table("transactions").update({
         "status": status,
         "updated_at": datetime.utcnow().isoformat(),
     }).eq("id", txn_id).execute()
 
-    if status == "completed" and previous_status != "completed":
+    if status == "completed" and previous_status != "completed" and txn.get("type") != "fund":
         user_result = supabase.table("users").select("email, name").eq("id", txn["user_id"]).execute()
         if user_result.data:
             txn_user = user_result.data[0]

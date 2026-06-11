@@ -16,6 +16,7 @@ type AuthContext = {
   signupWithGoogle: () => Promise<void>;
   logout: () => void;
   refreshBalance: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 };
 
 const AuthCtx = createContext<AuthContext | null>(null);
@@ -141,10 +142,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [token]);
 
+  const refreshUser = useCallback(async () => {
+    if (!token) return;
+    try {
+      const me = await apiGetMe(token);
+      setUser(me.user);
+      setBalance(me.balance);
+    } catch {
+      // ignore
+    }
+  }, [token]);
+
   const isAdmin = user?.is_admin === true;
 
   return (
-    <AuthCtx.Provider value={{ user, token, balance, loading, isAdmin, login, signup, loginWithGoogle, signupWithGoogle, logout, refreshBalance }}>
+    <AuthCtx.Provider value={{ user, token, balance, loading, isAdmin, login, signup, loginWithGoogle, signupWithGoogle, logout, refreshBalance, refreshUser }}>
       {children}
     </AuthCtx.Provider>
   );

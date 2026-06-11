@@ -9,7 +9,7 @@ import re
 from jose import jwt, JWTError
 from passlib.hash import bcrypt
 
-from models import SignupRequest, LoginRequest, SupabaseLogin
+from models import SignupRequest, LoginRequest, SupabaseLogin, UpdateProfileRequest
 from database import supabase
 
 load_dotenv()
@@ -292,3 +292,26 @@ def supabase_login(data: SupabaseLogin):
 def get_me(user: dict = Depends(get_current_user)):
     balance = _wallet_balance(user["id"])
     return {"user": _format_user(user), "balance": balance}
+
+
+@router.patch("/profile")
+def update_profile(data: UpdateProfileRequest, user: dict = Depends(get_current_user)):
+    updates = {}
+    if data.name is not None and data.name:
+        updates["name"] = data.name
+    if data.phone is not None and data.phone:
+        existing = supabase.table("users").select("id").eq("phone", data.phone).neq("id", user["id"]).execute()
+        if existing.data:
+            raise HTTPException(status_code=409, detail="Phone number already registered")
+        updates["phone"] = data.phone
+    if data.username is not None and data.username:
+        existing = supabase.table("users").select("id").eq("username", data.username).neq("id", user["id"]).execute()
+        if existing.data:
+            raise HTTPException(status_code=409, detail="Username already taken")
+        updates["username"] = data.username
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    result = supabase.table("users").update(updates).eq("id", user["id"]).execute()
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Failed to update profile")
+    return _format_user(result.data[0])

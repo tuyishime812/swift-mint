@@ -5,28 +5,33 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
+  ExternalLink,
   Loader2,
   MessageCircle,
   Monitor,
   Smartphone,
   Tv,
-  Wallet,
   Zap,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { billers } from "@/lib/billers";
-import { apiPayBill } from "@/lib/api";
 import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
+import { getSettings } from "@/lib/settings";
 
 function formatCurrency(n: number): string {
   return `MK ${n.toLocaleString("en-MW")}`;
 }
 
-function createIdempotencyKey(prefix: string): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return `${prefix}-${crypto.randomUUID()}`;
-  }
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+function buildWhatsAppMessage(biller: string, account: string, amount: number): string {
+  return [
+    "Hello SwiftMint Exchange, I would like to pay a bill.",
+    "",
+    `Biller: ${biller}`,
+    `Account number: ${account}`,
+    `Amount: MK ${amount.toLocaleString("en-MW")}`,
+    "",
+    "I have sent the money to your payment number.",
+  ].join("\n");
 }
 
 const billerIcon = (id: string): React.ElementType => {
@@ -37,7 +42,7 @@ const billerIcon = (id: string): React.ElementType => {
 };
 
 export default function PayPage() {
-  const { user, token, balance, loading: authLoading, refreshBalance } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [loaded, setLoaded] = useState(false);
   const [selectedBiller, setSelectedBiller] = useState(billers[0]);
@@ -45,45 +50,36 @@ export default function PayPage() {
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [result, setResult] = useState<{
-    reference: string; amount: number; fee: number; total: number;
-  } | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const paymentMethods = getSettings().paymentMethods;
 
   useEffect(() => {
     if (!authLoading && !user) { router.push("/login"); return; }
-    if (user) { setLoaded(true); refreshBalance(); }
-  }, [user, authLoading, router, refreshBalance]);
+    if (user) { setLoaded(true); }
+  }, [user, authLoading, router]);
 
   const numAmount = Number(amount) || 0;
-  const fee = Math.round(numAmount * 0.02);
-  const total = numAmount + fee;
-  const hasBalance = balance >= total;
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     if (!numAmount || numAmount <= 0) { setError("Enter a valid amount."); return; }
     if (!accountNumber.trim()) { setError("Enter your account number."); return; }
-    if (!hasBalance) { setError(`Insufficient balance. You need ${formatCurrency(total)}.`); return; }
-    if (!token) { setError("Not authenticated."); return; }
-
     setSubmitting(true);
-    try {
-      const data = await apiPayBill(token, {
-        biller: selectedBiller.name,
-        account_number: accountNumber.trim(),
-        amount: Math.round(numAmount),
-      }, createIdempotencyKey("bill"));
-      setResult({ reference: data.reference, amount: data.amount, fee: data.fee, total: data.total });
-      setSuccess(true);
-      await refreshBalance();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Payment failed.");
-    } finally {
-      setSubmitting(false);
-    }
+    setSubmitted(true);
+    setSubmitting(false);
   }
+
+  function handleReset() {
+    setSubmitted(false);
+    setAccountNumber("");
+    setAmount("");
+    setError("");
+  }
+
+  const waMessage = buildWhatsAppMessage(selectedBiller.name, accountNumber.trim(), numAmount);
+  const waUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(waMessage)}`;
 
   if (!loaded) {
     return (
@@ -108,8 +104,8 @@ export default function PayPage() {
           <p className="eyebrow">Pay bills</p>
           <h1>Pay your bills with SwiftMint</h1>
           <p>
-            Pay Zuku TV, ESCOM electricity, airtime, and more directly from your
-            SwiftMint Wallet.
+            Pay Zuku TV, ESCOM electricity, airtime, and more. Send us the money
+            and we&apos;ll pay your bill.
           </p>
         </div>
       </section>
@@ -117,45 +113,83 @@ export default function PayPage() {
       <section className="section">
         <div className="wallet-fund-layout">
           <div className="auth-card">
-            {success && result ? (
-              <div className="auth-success">
-                <CheckCircle2 size={48} />
-                <h2>Payment successful!</h2>
+            {submitted ? (
+              <div className="pay-instructions">
+                <CheckCircle2 size={44} style={{ color: "var(--brand)" }} />
+                <h2>Almost done!</h2>
                 <p>
-                  Your payment of {formatCurrency(result.amount)} to {selectedBiller.name}
-                  (Account: {accountNumber}) has been completed.
+                  To pay your <strong>{selectedBiller.name}</strong> bill
+                  (Account: <strong>{accountNumber.trim()}</strong>) of{" "}
+                  <strong>{formatCurrency(numAmount)}</strong>, follow these steps:
                 </p>
-                <p style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-                  Reference: {result.reference}
-                </p>
-                <div className="transfer-breakdown">
-                  <div><span>Amount</span><strong>{formatCurrency(result.amount)}</strong></div>
-                  <div><span>Fee (2%)</span><strong>{formatCurrency(result.fee)}</strong></div>
-                  <div><span>Total charged</span><strong>{formatCurrency(result.total)}</strong></div>
+
+                <div className="pay-steps">
+                  <div className="pay-step">
+                    <span className="pay-step-num">1</span>
+                    <div>
+                      <strong>Send the money</strong>
+                      <p>
+                        Send <strong>{formatCurrency(numAmount)}</strong> to any
+                        of our payment numbers below.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="pay-step">
+                    <span className="pay-step-num">2</span>
+                    <div>
+                      <strong>Contact us on WhatsApp</strong>
+                      <p>
+                        Tap the button below to send us your bill payment details
+                        via WhatsApp so we can process it.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="pay-step">
+                    <span className="pay-step-num">3</span>
+                    <div>
+                      <strong>We pay your bill</strong>
+                      <p>
+                        Once we confirm your payment, we&apos;ll process the bill
+                        payment and notify you.
+                      </p>
+                    </div>
+                  </div>
                 </div>
+
+                <div className="pay-methods-list">
+                  <strong>Our payment numbers:</strong>
+                  {paymentMethods.map((m) => (
+                    <div key={m} className="pay-method-item">
+                      <span>{m}:</span>
+                      <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">
+                        {formattedWhatsappNumber}
+                      </a>
+                    </div>
+                  ))}
+                </div>
+
                 <div className="transfer-success-actions">
-                  <Link className="button button-primary" href="/dashboard">
+                  <a
+                    className="button button-primary"
+                    href={waUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <MessageCircle size={18} />
+                    Confirm on WhatsApp
+                  </a>
+                  <button className="button button-secondary" type="button" onClick={handleReset}>
+                    Start over
+                  </button>
+                  <Link className="button button-secondary" href="/dashboard">
                     Go to Dashboard
                   </Link>
-                  <button className="button button-secondary" type="button" onClick={() => {
-                    setSuccess(false);
-                    setResult(null);
-                    setAccountNumber("");
-                    setAmount("");
-                  }}>
-                    Pay another bill
-                  </button>
                 </div>
               </div>
             ) : (
               <form className="transfer-form-compact" onSubmit={handleSubmit}>
                 <strong className="auth-form-title">Pay a bill</strong>
                 {error ? <div className="form-error">{error}</div> : null}
-
-                <div className="wallet-balance-hint">
-                  <Wallet size={16} />
-                  <span>Balance: {formatCurrency(balance)}</span>
-                </div>
 
                 <label>
                   <span>Select biller</span>
@@ -197,27 +231,17 @@ export default function PayPage() {
                   />
                 </label>
 
-                {numAmount > 0 ? (
-                  <div className="transfer-fee-preview">
-                    <div className="transfer-fee-row">
-                      <span>Fee (2%)</span>
-                      <strong>{formatCurrency(fee)}</strong>
-                    </div>
-                    <div className="transfer-fee-row">
-                      <span>Total to charge</span>
-                      <strong>{formatCurrency(total)}</strong>
-                    </div>
-                    {!hasBalance ? (
-                      <div className="transfer-insufficient">
-                        Insufficient balance. <Link href="/wallet">Fund your wallet</Link>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
+                <div className="pay-note">
+                  <MessageCircle size={16} />
+                  <span>
+                    After submitting, send the money to our payment number and
+                    contact us on WhatsApp to confirm.
+                  </span>
+                </div>
 
-                <button className="button button-primary form-submit" type="submit" disabled={submitting || !hasBalance}>
-                  {submitting ? <Loader2 className="spin" size={19} /> : <CheckCircle2 size={19} />}
-                  {submitting ? "Processing..." : "Pay now"}
+                <button className="button button-primary form-submit" type="submit" disabled={submitting}>
+                  {submitting ? <Loader2 className="spin" size={19} /> : <ExternalLink size={19} />}
+                  Continue
                 </button>
               </form>
             )}
@@ -230,8 +254,8 @@ export default function PayPage() {
               ))}
             </ul>
             <p className="auth-sidebar-text">
-              A 2% service fee applies to all bill payments. Minimum payment is
-              MK 100.
+              Send us the payment and we&apos;ll handle the rest. A 2% service
+              fee applies. Minimum payment is MK 100.
             </p>
             <div className="request-note">
               <MessageCircle size={20} />

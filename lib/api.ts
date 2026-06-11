@@ -197,6 +197,13 @@ export function apiUpdateTransactionStatus(token: string, txnId: string, status:
   });
 }
 
+export function apiCancelTransaction(token: string, txnId: string) {
+  return request<{ success: boolean; status: string }>(`/api/transactions/${txnId}/cancel`, {
+    method: "PATCH",
+    token,
+  });
+}
+
 export function apiDeleteTransaction(token: string, txnId: string) {
   return request<{ success: boolean }>(`/api/transactions/${txnId}`, {
     method: "DELETE",

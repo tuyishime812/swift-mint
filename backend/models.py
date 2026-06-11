@@ -67,6 +67,35 @@ class SignupRequest(BaseModel):
         return value
 
 
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = Field(None, max_length=100)
+    phone: Optional[str] = Field(None, max_length=32)
+    username: Optional[str] = Field(None, max_length=50)
+
+    @field_validator("name", "phone", mode="before")
+    @classmethod
+    def strip_text(cls, value: str) -> str:
+        if value is None:
+            return None
+        return _strip(value)
+
+    @field_validator("username", mode="before")
+    @classmethod
+    def normalize_identity(cls, value: str) -> str:
+        if value is None:
+            return None
+        return _normalize_identity(value)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        if not value:
+            return value
+        if not USERNAME_RE.match(value):
+            raise ValueError("Username may contain lowercase letters, numbers, dots, underscores, and hyphens")
+        return value
+
+
 class LoginRequest(BaseModel):
     email_or_username: str = Field(min_length=1, max_length=255)
     password: str = Field(min_length=1, max_length=128)

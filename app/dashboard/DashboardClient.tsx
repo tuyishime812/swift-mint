@@ -14,20 +14,23 @@ import {
   Filter,
   Loader2,
   MessageCircle,
+  RefreshCw,
   Search,
   Smartphone,
   TrendingUp,
+  Wallet,
   X,
   XCircle,
 } from "lucide-react";
 import {
-  ShieldCheck, Star,
+  ShieldCheck, Star, User,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   type TransactionData,
   apiGetTransactions,
   apiCreateTestimonial,
+  apiCancelTransaction,
 } from "@/lib/api";
 import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 import { getSettings } from "@/lib/settings";
@@ -174,7 +177,7 @@ function DetailModal({
 }
 
 export function DashboardClient() {
-  const { user, token, balance, loading: authLoading, isAdmin } = useAuth();
+  const { user, token, balance, loading: authLoading, isAdmin, refreshBalance } = useAuth();
   const router = useRouter();
   const [allTransactions, setAllTransactions] = useState<TransactionData[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -189,6 +192,7 @@ export function DashboardClient() {
   const [testimonialSubmitting, setTestimonialSubmitting] = useState(false);
   const [testimonialDone, setTestimonialDone] = useState(false);
   const [testimonialError, setTestimonialError] = useState("");
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState("");
 
   const fetchTransactions = useCallback(async () => {
@@ -211,6 +215,16 @@ export function DashboardClient() {
       setLoaded(true);
     }
   }, [user, token, authLoading, router, fetchTransactions]);
+
+  // Auto-refresh every 30 seconds so users see admin status changes
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => {
+      fetchTransactions();
+      refreshBalance();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [token, fetchTransactions, refreshBalance]);
 
   const filtered = useMemo(() => {
     let list = allTransactions;
@@ -285,10 +299,13 @@ export function DashboardClient() {
   const statusOptions = [
     { value: "all", label: "All" },
     { value: "pending", label: "Pending" },
+    { value: "confirmed", label: "Confirmed" },
     { value: "processing", label: "Processing" },
     { value: "completed", label: "Completed" },
     { value: "cancelled", label: "Cancelled" },
   ];
+
+  const needsProfileCompletion = user && (!user.phone || !user.username);
 
   return (
     <main>
@@ -303,8 +320,28 @@ export function DashboardClient() {
         </div>
       </section>
 
+      {needsProfileCompletion ? (
+        <div className="section" style={{ paddingTop: 0, paddingBottom: 0 }}>
+          <div className="dash-profile-prompt">
+            <User size={20} />
+            <div>
+              <strong>Complete your profile</strong>
+              <p>Add your phone number and set a username to get the most out of SwiftMint.</p>
+            </div>
+            <Link className="button button-primary" href="/profile" style={{ minHeight: 38, fontSize: "0.85rem" }}>
+              Complete profile
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
       <section className="section" aria-label="Dashboard summary">
         <div className="dash-stats">
+          <div className="dash-stat-card">
+            <span className="stat-icon"><Wallet size={22} /></span>
+            <strong className="stat-value">{formatCurrency(balance ?? 0)}</strong>
+            <span className="stat-label">Wallet balance</span>
+          </div>
           <div className="dash-stat-card">
             <span className="stat-icon"><TrendingUp size={22} /></span>
             <strong className="stat-value">{allTransactions.length}</strong>
@@ -327,14 +364,22 @@ export function DashboardClient() {
             <ArrowRight size={17} />
             Place an order
           </Link>
-          <Link className="button button-secondary" href="/dashboard#payment-info">
+          <Link className="button button-secondary" href="/pay">
             <Smartphone size={17} />
+            Pay bills
+          </Link>
+          <Link className="button button-secondary" href="/dashboard#payment-info">
+            <Download size={17} />
             Send to our number
           </Link>
           <a className="button button-secondary" href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">
             <MessageCircle size={17} />
             Order via WhatsApp
           </a>
+          <Link className="button button-secondary" href="/profile">
+            <User size={17} />
+            Profile
+          </Link>
           {isAdmin ? (
             <Link className="button admin-link" href="/admin">
               <ShieldCheck size={17} />
@@ -456,10 +501,26 @@ export function DashboardClient() {
                           </span>
                         </td>
                         <td>
-                          <button className="dash-action-btn" title="View details" type="button"
-                            onClick={(e) => { e.stopPropagation(); setDetailTxn(t); }}>
-                            <Search size={14} />
-                          </button>
+                          <div className="dash-row-actions">
+                            {t.status === "pending" ? (
+                              <button className="dash-action-btn dash-action-danger" title="Cancel transaction" type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (!token || !confirm("Cancel this transaction?")) return;
+                                  try {
+                                    await apiCancelTransaction(token, t.id);
+                                    await fetchTransactions();
+                                    await refreshBalance();
+                                  } catch { /* ignore */ }
+                                }}>
+                                <XCircle size={14} />
+                              </button>
+                            ) : null}
+                            <button className="dash-action-btn" title="View details" type="button"
+                              onClick={(e) => { e.stopPropagation(); setDetailTxn(t); }}>
+                              <Search size={14} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -490,7 +551,26 @@ export function DashboardClient() {
                     </div>
                     <div className="dash-mobile-card-row">
                       <span className="dash-mobile-card-date">{formatDate(t.created_at)}</span>
-                      <span className="dash-mobile-card-fee">Fee: {formatCurrency(t.fee)}</span>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <span className="dash-mobile-card-fee">Fee: {formatCurrency(t.fee)}</span>
+                        {t.status === "pending" ? (
+                          <button className="dash-action-btn dash-action-danger" title="Cancel" type="button"
+                            disabled={cancellingId === t.id}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!token || !confirm("Cancel this transaction?")) return;
+                              setCancellingId(t.id);
+                              try {
+                                await apiCancelTransaction(token, t.id);
+                                await fetchTransactions();
+                                await refreshBalance();
+                              } catch { /* ignore */ }
+                              finally { setCancellingId(null); }
+                            }}>
+                            {cancellingId === t.id ? <Loader2 className="spin" size={13} /> : <XCircle size={13} />}
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 );
@@ -524,15 +604,15 @@ export function DashboardClient() {
         )}
       </section>
 
-      <section className="section" aria-labelledby="testimonial-title" style={{ paddingBottom: 0 }}>
+      <section className="section dash-testimonials-section" aria-labelledby="testimonial-title">
         <div className="section-heading">
           <p className="eyebrow">Share your experience</p>
           <h2 id="testimonial-title">Leave a testimonial</h2>
           <p>Tell others what you think about SwiftMint. Your feedback helps us improve.</p>
         </div>
-        <div style={{ maxWidth: 600, marginTop: 28 }}>
+        <div className="dash-testimonial-card">
           {testimonialDone ? (
-            <div className="form-success" style={{ padding: "16px 20px" }}>
+            <div className="form-success">
               <CheckCircle2 size={20} />
               <span>Thank you! Your testimonial has been submitted and will appear once approved.</span>
             </div>
@@ -553,53 +633,45 @@ export function DashboardClient() {
               }
             }}>
               {testimonialError ? <div className="form-error">{testimonialError}</div> : null}
-              <label style={{ display: "grid", gap: 8 }}>
-                <span style={{ fontSize: "0.88rem", fontWeight: 820 }}>Your testimonial</span>
+              <div className="dash-testimonial-field">
+                <label htmlFor="testimonial-textarea">Your testimonial</label>
                 <textarea
+                  id="testimonial-textarea"
                   required
                   rows={3}
                   maxLength={500}
                   placeholder="Share your experience with SwiftMint..."
                   value={testimonialText}
                   onChange={(e) => setTestimonialText(e.target.value)}
-                  style={{
-                    appearance: "none",
-                    background: "var(--surface-alt)",
-                    border: "1px solid var(--line)",
-                    borderRadius: 8,
-                    color: "var(--ink)",
-                    font: "inherit",
-                    minHeight: 80,
-                    outline: "none",
-                    padding: "12px 14px",
-                    resize: "vertical",
-                    width: "100%",
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = "var(--brand)"}
-                  onBlur={(e) => e.target.style.borderColor = "var(--line)"}
                 />
-              </label>
-              <div style={{ display: "flex", gap: 10, marginTop: 14, alignItems: "center" }}>
-                <button className="button button-primary" type="submit" disabled={testimonialSubmitting || !testimonialText.trim()}
-                  style={{ minHeight: 42, fontSize: "0.88rem" }}>
+                <div className="dash-testimonial-counter">{testimonialText.length}/500</div>
+              </div>
+              <div className="dash-testimonial-actions">
+                <button className="button button-primary" type="submit" disabled={testimonialSubmitting || !testimonialText.trim()}>
                   {testimonialSubmitting ? <Loader2 className="spin" size={17} /> : <Star size={17} />}
                   {testimonialSubmitting ? "Submitting..." : "Submit testimonial"}
                 </button>
-                <span style={{ color: "var(--muted)", fontSize: "0.82rem" }}>{testimonialText.length}/500</span>
               </div>
             </form>
           )}
         </div>
       </section>
 
-      <section className="info-band" aria-labelledby="dash-help">
-        <MessageCircle size={26} />
-        <div>
-          <h2 id="dash-help">Need help placing an order?</h2>
-          <p>
-            Contact SwiftMint on WhatsApp at <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">{formattedWhatsappNumber}</a> to place
-            an order or get assistance with your transfers.
-          </p>
+      <section className="dash-help-band" aria-labelledby="dash-help">
+        <div className="dash-help-inner">
+          <MessageCircle size={28} />
+          <div>
+            <h2 id="dash-help">Need help placing an order?</h2>
+            <p>
+              Contact SwiftMint on WhatsApp at <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">{formattedWhatsappNumber}</a> to place
+              an order, pay a bill, or get assistance with your transfers.
+            </p>
+            <p style={{ marginTop: 8 }}>
+              <Link href="/pay" style={{ color: "var(--accent)", fontWeight: 760, textDecoration: "underline", textUnderlineOffset: 2 }}>
+                Pay your bills online &rarr;
+              </Link>
+            </p>
+          </div>
         </div>
       </section>
 

@@ -10,28 +10,8 @@ from models import AdminFundUser
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
-def _generate_ref() -> str:
-    return f"ADM-{datetime.utcnow().strftime('%y%m%d%H%M%S')}-{uuid4().hex[:8].upper()}"
-
-
-def _rpc_data(result) -> dict:
-    data = result.data
-    if isinstance(data, dict):
-        return data
-    if isinstance(data, list) and data and isinstance(data[0], dict):
-        return data[0]
-    raise HTTPException(status_code=500, detail="Unexpected database response")
-
-
-def _raise_db_error(exc: Exception):
-    message = str(exc)
-    if "Wallet not found" in message:
-        raise HTTPException(status_code=404, detail="Wallet not found")
-    if "duplicate key" in message:
-        raise HTTPException(status_code=409, detail="This funding request was already processed (duplicate). If this is a mistake, try again with a different amount.")
-    if "idempotency" in message:
-        raise HTTPException(status_code=409, detail="This funding request was already processed. Refresh the page and try again.")
-    raise HTTPException(status_code=500, detail="Funding could not be processed")
+def _generate_ref(prefix: str = "ADM") -> str:
+    return f"{prefix}-{datetime.utcnow().strftime('%y%m%d%H%M%S')}-{uuid4().hex[:8].upper()}"
 
 
 @router.get("/users-with-balance")
@@ -66,18 +46,48 @@ def admin_fund_user(
     if idempotency_key and len(idempotency_key) > 128:
         raise HTTPException(status_code=400, detail="Idempotency-Key is too long")
 
-    try:
-        result = supabase.rpc(
-            "credit_wallet_by_admin",
-            {
-                "p_user_id": body.user_id,
-                "p_admin_id": admin["id"],
-                "p_amount": body.amount,
-                "p_reference": _generate_ref(),
-                "p_idempotency_key": idempotency_key,
-            },
-        ).execute()
-    except Exception as exc:
-        _raise_db_error(exc)
+    now = datetime.utcnow().isoformat()
+    ref = _generate_ref()
 
-    return _rpc_data(result)
+    if idempotency_key:
+        existing = (
+            supabase.table("transactions")
+            .select("id")
+            .eq("user_id", body.user_id)
+            .eq("type", "fund")
+            .eq("idempotency_key", idempotency_key)
+            .execute()
+        )
+        if existing.data:
+            raise HTTPException(status_code=409, detail="This funding request was already submitted.")
+
+    try:
+        result = supabase.table("transactions").insert({
+            "user_id": body.user_id,
+            "type": "fund",
+            "status": "pending",
+            "amount": body.amount,
+            "fee": 0,
+            "payout": body.amount,
+            "currency": "MWK",
+            "description": "Account credit",
+            "reference": ref,
+            "idempotency_key": idempotency_key,
+            "created_at": now,
+            "updated_at": now,
+        }).execute()
+    except Exception as exc:
+        message = str(exc)
+        if "duplicate key" in message or "idempotency" in message:
+            raise HTTPException(status_code=409, detail="This funding request was already submitted.")
+        raise HTTPException(status_code=500, detail="Funding could not be created")
+
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Funding could not be created")
+
+    return {
+        "success": True,
+        "reference": ref,
+        "amount": body.amount,
+        "status": "pending",
+    }

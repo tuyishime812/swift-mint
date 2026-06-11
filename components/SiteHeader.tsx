@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, MessageCircle, Moon, ShieldCheck, Sun, User, X, LogIn } from "lucide-react";
+import { LogOut, Menu, MessageCircle, Moon, ShieldCheck, Smartphone, Sun, User, X, LogIn } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/components/ThemeProvider";
@@ -77,8 +77,11 @@ export function SiteHeader() {
               <Link className="nav-wallet-btn" href="/wallet">
                 <span className="nav-balance">MK {balance.toLocaleString()}</span>
               </Link>
-              <Link className="nav-icon-btn" href="/dashboard" title="Dashboard">
+              <Link className="nav-icon-btn" href="/profile" title="Profile">
                 <User size={18} />
+              </Link>
+              <Link className="nav-icon-btn" href="/dashboard" title="Dashboard">
+                <Smartphone size={18} />
               </Link>
               <button className="nav-icon-btn" type="button" onClick={logout} title="Log out">
                 <LogOut size={18} />

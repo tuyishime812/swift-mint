@@ -126,3 +126,6 @@ def root():
 @app.get("/api/health")
 def health():
     return {"status": "ok", "app": os.getenv("APP_NAME", "SwiftMint")}
+
+
+
