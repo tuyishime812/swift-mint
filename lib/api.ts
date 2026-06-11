@@ -261,6 +261,41 @@ export function apiAdminFundUser(token: string, userId: string, amount: number, 
 }
 
 // Testimonials
+// Notifications
+export type NotificationData = {
+  id: string;
+  user_id: string;
+  transaction_id: string;
+  type: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+};
+
+export function apiGetNotifications(token: string, unreadOnly = false) {
+  const params = new URLSearchParams({ limit: "50", offset: "0" });
+  if (unreadOnly) params.set("unread_only", "true");
+  return request<{ notifications: NotificationData[] }>(`/api/notifications/?${params}`, { token });
+}
+
+export function apiUnreadNotificationCount(token: string) {
+  return request<{ count: number }>("/api/notifications/unread-count", { token });
+}
+
+export function apiMarkNotificationRead(token: string, notifId: string) {
+  return request<{ success: boolean }>(`/api/notifications/${notifId}/read`, {
+    method: "PATCH",
+    token,
+  });
+}
+
+export function apiMarkAllNotificationsRead(token: string) {
+  return request<{ success: boolean }>("/api/notifications/mark-all-read", {
+    method: "PATCH",
+    token,
+  });
+}
+
 export type TestimonialData = {
   id: string;
   user_id?: string;

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, Menu, MessageCircle, Moon, ShieldCheck, Smartphone, Sun, User, X, LogIn } from "lucide-react";
+import { Bell, LogOut, Menu, MessageCircle, Moon, ShieldCheck, Smartphone, Sun, User, X, LogIn } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/components/ThemeProvider";
+import { NotificationBell } from "@/components/NotificationBell";
 
 const navItems = [
   { href: "/", label: "Home" },
@@ -77,6 +78,7 @@ export function SiteHeader() {
               <Link className="nav-wallet-btn" href="/wallet">
                 <span className="nav-balance">MK {balance.toLocaleString()}</span>
               </Link>
+              <NotificationBell />
               <Link className="nav-icon-btn" href="/profile" title="Profile">
                 <User size={18} />
               </Link>

@@ -70,7 +70,7 @@ def admin_fund_user(
             "fee": 0,
             "payout": body.amount,
             "currency": "MWK",
-            "description": "Account credit",
+            "description": "Deposited by SwiftMint Exchange",
             "reference": ref,
             "idempotency_key": idempotency_key,
             "created_at": now,

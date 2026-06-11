@@ -15,6 +15,7 @@ from routes.transactions import router as transactions_router
 from routes.admin import router as admin_router
 from routes.admin_settings import router as admin_settings_router
 from routes.testimonials import router as testimonials_router
+from routes.notifications import router as notifications_router
 
 load_dotenv()
 
@@ -44,6 +45,7 @@ app.include_router(transactions_router)
 app.include_router(admin_router)
 app.include_router(admin_settings_router)
 app.include_router(testimonials_router)
+app.include_router(notifications_router)
 
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "120"))
 _requests_by_client: dict[str, deque[float]] = defaultdict(deque)

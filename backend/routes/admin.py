@@ -3,6 +3,7 @@ from datetime import datetime
 
 from database import supabase
 from email_service import send_transaction_completed_email
+from notification_service import notify_status_change, notify_fund_credited
 from routes.admin_base import require_admin
 from models import UpdateTransactionStatus
 
@@ -73,13 +74,20 @@ def admin_update_status(
     previous_status = txn.get("status")
 
     # Credit wallet when a fund transaction is completed
-    if status == "completed" and previous_status != "completed" and txn.get("type") == "fund":
+    is_new_completion = status == "completed" and previous_status != "completed"
+
+    if is_new_completion and txn.get("type") == "fund":
         _credit_wallet(txn["user_id"], txn["amount"])
+        notify_fund_credited(txn["user_id"], txn_id, txn["amount"])
 
     supabase.table("transactions").update({
         "status": status,
         "updated_at": datetime.utcnow().isoformat(),
     }).eq("id", txn_id).execute()
+
+    # Send notification to user about the status change
+    if status != previous_status:
+        notify_status_change(txn["user_id"], txn_id, status, txn)
 
     if status == "completed" and previous_status != "completed" and txn.get("type") != "fund":
         user_result = supabase.table("users").select("email, name").eq("id", txn["user_id"]).execute()

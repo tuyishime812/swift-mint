@@ -97,6 +97,31 @@ function DetailModal({
   onClose: () => void;
 }) {
   const StatusIcon = statusConfig[txn.status]?.icon || Clock3;
+  const { token } = useAuth();
+
+  function buildReceiptText(): string {
+    const lines = [
+      "=== SWIFTMINT EXCHANGE RECEIPT ===",
+      "",
+      `Reference: ${txn.reference}`,
+      `Status: ${statusConfig[txn.status]?.label || txn.status}`,
+      `Amount: ${formatCurrency(txn.amount)}`,
+      `Fee: ${formatCurrency(txn.fee)}`,
+      `Payout: ${formatCurrency(txn.payout)}`,
+    ];
+    if (txn.recipient_name) lines.push(`Recipient: ${txn.recipient_name}`);
+    if (txn.country) lines.push(`Country: ${txn.country}`);
+    if (txn.wallet_type) lines.push(`Wallet: ${txn.wallet_type}`);
+    if (txn.recipient_number) lines.push(`Mobile: ${txn.recipient_number}`);
+    lines.push("");
+    lines.push("Thank you for using SwiftMint Exchange.");
+    return lines.join("\n");
+  }
+
+  function waHref(msg: string) {
+    return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`;
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -169,6 +194,17 @@ function DetailModal({
           <span>Description</span>
           <p>{txn.description}</p>
         </div>
+
+        {txn.status === "completed" || txn.status === "processing" ? (
+          <div className="dash-receipt-box">
+            <strong>Receipt</strong>
+            <pre className="dash-receipt-text">{buildReceiptText()}</pre>
+            <a className="button button-primary" href={waHref(buildReceiptText())}
+              target="_blank" rel="noopener noreferrer" style={{ marginTop: 8, fontSize: "0.85rem" }}>
+              <MessageCircle size={16} /> Confirm on WhatsApp
+            </a>
+          </div>
+        ) : null}
 
         <StatusTimeline status={txn.status} />
       </div>
