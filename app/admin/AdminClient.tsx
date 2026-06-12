@@ -70,6 +70,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   confirmed: { label: "Confirmed", className: "badge-confirmed" },
   processing: { label: "Processing", className: "badge-processing" },
   completed: { label: "Completed", className: "badge-completed" },
+  sender_confirmed: { label: "Sender Confirmed", className: "badge-completed" },
   cancelled: { label: "Cancelled", className: "badge-cancelled" },
 };
 
@@ -321,7 +322,7 @@ export function AdminClient() {
                 ) : null}
               </div>
               <div className="dash-filters">
-                {["all", "pending", "confirmed", "processing", "completed", "cancelled"].map((s) => (
+                {["all", "pending", "confirmed", "processing", "completed", "sender_confirmed", "cancelled"].map((s) => (
                   <button key={s} type="button"
                     className={`dash-filter-btn ${statusFilter === s ? "active" : ""}`}
                     onClick={() => setStatusFilter(s)}>
@@ -387,6 +388,12 @@ export function AdminClient() {
                               </button>
                             ) : null}
                             {t.status === "completed" ? (
+                              <button className="dash-action-btn dash-action-danger" title="Delete transaction record"
+                                onClick={() => handleDelete(t.id)}>
+                                <Trash2 size={14} /> Delete
+                              </button>
+                            ) : null}
+                            {t.status === "sender_confirmed" ? (
                               <button className="dash-action-btn dash-action-danger" title="Delete transaction record"
                                 onClick={() => handleDelete(t.id)}>
                                 <Trash2 size={14} /> Delete

@@ -151,6 +151,31 @@ def pay_bill(
     return _rpc_data(result)
 
 
+@router.patch("/{txn_id}/sender-confirm", response_model=dict)
+def sender_confirm_transaction(
+    txn_id: str,
+    user: dict = Depends(get_current_user),
+):
+    result = supabase.table("transactions").select("*").eq("id", txn_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    txn = result.data[0]
+
+    if txn["user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="You can only confirm your own transactions")
+
+    if txn["status"] != "completed":
+        raise HTTPException(status_code=400, detail="Only completed transactions can be confirmed by sender")
+
+    supabase.table("transactions").update({
+        "status": "sender_confirmed",
+        "updated_at": datetime.utcnow().isoformat(),
+    }).eq("id", txn_id).execute()
+
+    return {"success": True, "status": "sender_confirmed"}
+
+
 @router.patch("/{txn_id}/cancel", response_model=dict)
 def cancel_transaction(
     txn_id: str,

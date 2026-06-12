@@ -204,6 +204,13 @@ export function apiCancelTransaction(token: string, txnId: string) {
   });
 }
 
+export function apiSenderConfirmTransaction(token: string, txnId: string) {
+  return request<{ success: boolean; status: string }>(`/api/transactions/${txnId}/sender-confirm`, {
+    method: "PATCH",
+    token,
+  });
+}
+
 export function apiDeleteTransaction(token: string, txnId: string) {
   return request<{ success: boolean }>(`/api/transactions/${txnId}`, {
     method: "DELETE",

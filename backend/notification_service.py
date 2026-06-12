@@ -24,7 +24,10 @@ def notify_status_change(user_id: str, txn_id: str, status: str, txn_details: di
         ),
         "completed": (
             "Your transaction has been completed successfully! The recipient has received "
-            "the funds. Check your dashboard for the full receipt."
+            "the funds. Please confirm receipt on your dashboard."
+        ),
+        "sender_confirmed": (
+            "Thank you! Your confirmation has been received. The transaction is now fully closed."
         ),
         "cancelled": (
             "Your transaction has been cancelled. If you believe this was a mistake, "

@@ -62,7 +62,7 @@ def admin_update_status(
     admin: dict = Depends(require_admin),
 ):
     status = body.status.value
-    valid_statuses = ["pending", "confirmed", "processing", "completed", "cancelled"]
+    valid_statuses = ["pending", "confirmed", "processing", "completed", "sender_confirmed", "cancelled"]
     if status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
 

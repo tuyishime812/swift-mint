@@ -31,6 +31,7 @@ import {
   apiGetTransactions,
   apiCreateTestimonial,
   apiCancelTransaction,
+  apiSenderConfirmTransaction,
 } from "@/lib/api";
 import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 import { getSettings } from "@/lib/settings";
@@ -56,10 +57,11 @@ const statusConfig: Record<string, { label: string; icon: React.ElementType; cla
   confirmed: { label: "Confirmed", icon: CheckCircle2, className: "badge-confirmed" },
   processing: { label: "Processing", icon: Loader2, className: "badge-processing" },
   completed: { label: "Completed", icon: CheckCircle2, className: "badge-completed" },
+  sender_confirmed: { label: "Sender Confirmed", icon: CheckCircle2, className: "badge-completed" },
   cancelled: { label: "Cancelled", icon: XCircle, className: "badge-cancelled" },
 };
 
-const statusFlow = ["pending", "confirmed", "processing", "completed"] as const;
+const statusFlow = ["pending", "confirmed", "processing", "completed", "sender_confirmed"] as const;
 
 function StatusTimeline({ status }: { status: string }) {
   if (status === "cancelled") {
@@ -92,35 +94,13 @@ function StatusTimeline({ status }: { status: string }) {
 function DetailModal({
   txn,
   onClose,
+  onSenderConfirm,
 }: {
   txn: TransactionData;
   onClose: () => void;
+  onSenderConfirm?: (txnId: string) => Promise<void>;
 }) {
   const StatusIcon = statusConfig[txn.status]?.icon || Clock3;
-  const { token } = useAuth();
-
-  function buildReceiptText(): string {
-    const lines = [
-      "=== SWIFTMINT EXCHANGE RECEIPT ===",
-      "",
-      `Reference: ${txn.reference}`,
-      `Status: ${statusConfig[txn.status]?.label || txn.status}`,
-      `Amount: ${formatCurrency(txn.amount)}`,
-      `Fee: ${formatCurrency(txn.fee)}`,
-      `Payout: ${formatCurrency(txn.payout)}`,
-    ];
-    if (txn.recipient_name) lines.push(`Recipient: ${txn.recipient_name}`);
-    if (txn.country) lines.push(`Country: ${txn.country}`);
-    if (txn.wallet_type) lines.push(`Wallet: ${txn.wallet_type}`);
-    if (txn.recipient_number) lines.push(`Mobile: ${txn.recipient_number}`);
-    lines.push("");
-    lines.push("Thank you for using SwiftMint Exchange.");
-    return lines.join("\n");
-  }
-
-  function waHref(msg: string) {
-    return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`;
-  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -195,14 +175,17 @@ function DetailModal({
           <p>{txn.description}</p>
         </div>
 
-        {txn.status === "completed" || txn.status === "processing" ? (
+        {txn.status === "completed" ? (
           <div className="dash-receipt-box">
-            <strong>Receipt</strong>
-            <pre className="dash-receipt-text">{buildReceiptText()}</pre>
-            <a className="button button-primary" href={waHref(buildReceiptText())}
-              target="_blank" rel="noopener noreferrer" style={{ marginTop: 8, fontSize: "0.85rem" }}>
-              <MessageCircle size={16} /> Confirm on WhatsApp
-            </a>
+            <strong>Confirm receipt</strong>
+            <p style={{ fontSize: "0.85rem", color: "var(--muted)", marginTop: 4 }}>
+              The admin has marked this transaction as completed. Please confirm that you have received the funds or the recipient has been paid.
+            </p>
+            <button className="button button-primary" type="button"
+              onClick={() => onSenderConfirm?.(txn.id)}
+              style={{ marginTop: 8, fontSize: "0.85rem" }}>
+              <CheckCircle2 size={16} /> Confirm Receipt
+            </button>
           </div>
         ) : null}
 
@@ -229,6 +212,7 @@ export function DashboardClient() {
   const [testimonialDone, setTestimonialDone] = useState(false);
   const [testimonialError, setTestimonialError] = useState("");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState("");
 
   const fetchTransactions = useCallback(async () => {
@@ -338,6 +322,7 @@ export function DashboardClient() {
     { value: "confirmed", label: "Confirmed" },
     { value: "processing", label: "Processing" },
     { value: "completed", label: "Completed" },
+    { value: "sender_confirmed", label: "Sender Confirmed" },
     { value: "cancelled", label: "Cancelled" },
   ];
 
@@ -715,6 +700,15 @@ export function DashboardClient() {
         <DetailModal
           txn={detailTxn}
           onClose={() => setDetailTxn(null)}
+          onSenderConfirm={async (txnId) => {
+            if (!token || confirmingId) return;
+            setConfirmingId(txnId);
+            try {
+              await apiSenderConfirmTransaction(token, txnId);
+              await fetchTransactions();
+            } catch { /* ignore */ }
+            finally { setConfirmingId(null); setDetailTxn(null); }
+          }}
         />
       ) : null}
     </main>

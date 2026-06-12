@@ -32,6 +32,7 @@ class TransactionStatus(str, Enum):
     CONFIRMED = "confirmed"
     PROCESSING = "processing"
     COMPLETED = "completed"
+    SENDER_CONFIRMED = "sender_confirmed"
     CANCELLED = "cancelled"
 
 

@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   type TEXT NOT NULL CHECK (type IN ('send', 'receive', 'fund', 'bill', 'fee')),
-  status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed', 'processing', 'completed', 'cancelled')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'confirmed', 'processing', 'completed', 'sender_confirmed', 'cancelled')),
   amount BIGINT NOT NULL,
   fee BIGINT NOT NULL DEFAULT 0,
   payout BIGINT NOT NULL DEFAULT 0,
