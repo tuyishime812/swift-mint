@@ -1,8 +1,16 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { MessageCircle, ShieldCheck, MapPin, Mail } from "lucide-react";
 import { formattedWhatsappNumber, whatsappNumber } from "@/lib/swiftmint";
 
 export function SiteFooter() {
+  const pathname = usePathname();
+  // App-shell routes use their own layout without the marketing footer
+  const appShellRoutes = ["/dashboard", "/wallet", "/transfer", "/pay", "/profile", "/admin"];
+  if (appShellRoutes.includes(pathname)) return null;
+
   return (
     <footer className="site-footer">
       <div className="footer-inner">
@@ -44,7 +52,6 @@ export function SiteFooter() {
             <strong className="footer-heading">Account</strong>
             <Link href="/signup">Sign Up</Link>
             <Link href="/login">Login</Link>
-            <Link href="/dashboard">Dashboard</Link>
             <Link href="/transfer">New Transfer</Link>
           </div>
           <div className="footer-col">

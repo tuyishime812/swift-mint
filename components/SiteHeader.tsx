@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, LogOut, Menu, MessageCircle, Moon, ShieldCheck, Smartphone, Sun, User, X, LogIn } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Bell, ChevronDown, LogOut, Menu, MessageCircle, Moon, ShieldCheck, Smartphone, Sun, User, X, LogIn, UserPlus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/components/ThemeProvider";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -23,6 +23,24 @@ export function SiteHeader() {
   const { user, logout, isAdmin, balance } = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+
+  // Close the account dropdown on outside click
+  useEffect(() => {
+    if (!accountOpen) return;
+    function onClick(e: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [accountOpen]);
+
+  // These routes render their own app-shell chrome (sidebar + topbar)
+  const appShellRoutes = ["/dashboard", "/wallet", "/transfer", "/pay", "/profile", "/admin"];
+  const hideOnDashboard = appShellRoutes.includes(pathname);
 
   useEffect(() => {
     if (menuOpen) {
@@ -35,14 +53,17 @@ export function SiteHeader() {
 
   useEffect(() => {
     setMenuOpen(false);
+    setAccountOpen(false);
   }, [pathname]);
+
+  if (hideOnDashboard) return null;
 
   return (
     <header className="site-header">
       <div className="site-header-inner">
         <Link className="brand" href="/">
           <span className="brand-mark">SM</span>
-          <span className="brand-name">SwiftMint Exchange</span>
+          <span className="brand-name">SwiftMint</span>
         </Link>
 
         <nav className="desktop-nav" aria-label="Primary navigation">
@@ -90,12 +111,30 @@ export function SiteHeader() {
               </button>
             </div>
           ) : (
-            <div className="nav-auth">
-              <Link className="nav-signup" href="/signup">Sign up</Link>
-              <Link className="nav-login" href="/login">
-                <LogIn size={15} />
-                Login
-              </Link>
+            <div className="nav-account" ref={accountRef}>
+              <button
+                type="button"
+                className="nav-account-btn"
+                aria-haspopup="menu"
+                aria-expanded={accountOpen}
+                onClick={() => setAccountOpen((o) => !o)}
+              >
+                <User size={16} aria-hidden="true" />
+                <span>Account</span>
+                <ChevronDown size={15} className={`nav-account-chev${accountOpen ? " open" : ""}`} aria-hidden="true" />
+              </button>
+              {accountOpen ? (
+                <div className="nav-account-menu" role="menu">
+                  <Link className="nav-account-item" href="/login" role="menuitem">
+                    <LogIn size={16} aria-hidden="true" />
+                    <span>Login</span>
+                  </Link>
+                  <Link className="nav-account-item nav-account-item-primary" href="/signup" role="menuitem">
+                    <UserPlus size={16} aria-hidden="true" />
+                    <span>Sign up</span>
+                  </Link>
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -158,15 +197,18 @@ export function SiteHeader() {
               </>
             ) : (
               <>
-              <Link className="button button-primary" href="/signup">Sign up</Link>
-              <Link className="button button-secondary" href="/login">
-                <LogIn size={15} />
+              <Link className="button mobile-cta-green" href="/signup">
+                <UserPlus size={16} />
+                Sign up
+              </Link>
+              <Link className="button mobile-cta-white" href="/login">
+                <LogIn size={16} />
                 Login
               </Link>
               </>
             )}
           </div>
-          <Link className="button button-primary" href="/transfer">
+          <Link className="button mobile-cta-green" href="/transfer">
             <MessageCircle size={18} aria-hidden="true" />
             Send money
           </Link>

@@ -10,11 +10,9 @@ import {
   ChevronRight,
   Clock3,
   Download,
-  ExternalLink,
   Filter,
   Loader2,
   MessageCircle,
-  RefreshCw,
   Search,
   Smartphone,
   TrendingUp,
@@ -22,9 +20,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import {
-  ShieldCheck, Star, User,
-} from "lucide-react";
+import { Star, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   type TransactionData,
@@ -35,6 +31,7 @@ import {
 } from "@/lib/api";
 import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 import { getSettings } from "@/lib/settings";
+import { DashboardShell } from "@/components/DashboardShell";
 
 const PER_PAGE = 10;
 
@@ -196,7 +193,7 @@ function DetailModal({
 }
 
 export function DashboardClient() {
-  const { user, token, balance, loading: authLoading, isAdmin, refreshBalance } = useAuth();
+  const { user, token, balance, loading: authLoading, refreshBalance } = useAuth();
   const router = useRouter();
   const [allTransactions, setAllTransactions] = useState<TransactionData[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -267,14 +264,6 @@ export function DashboardClient() {
 
   useEffect(() => { setPage(1); }, [search, typeFilter, statusFilter]);
 
-  const totalSent = allTransactions
-    .filter((t) => t.type === "send" && t.status !== "cancelled")
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const totalFees = allTransactions
-    .filter((t) => t.status !== "cancelled")
-    .reduce((sum, t) => sum + t.fee, 0);
-
   const completedCount = allTransactions.filter((t) => t.status === "completed").length;
   const pendingCount = allTransactions.filter((t) => t.status === "pending" || t.status === "processing").length;
 
@@ -295,17 +284,20 @@ export function DashboardClient() {
 
   if (!loaded || fetching) {
     return (
-      <main>
-        <section className="page-hero">
-          <div className="page-hero-inner">
-            <div className="loading-skeleton">
-              <div className="skeleton-line skeleton-eyebrow" />
-              <div className="skeleton-line skeleton-title" />
-              <div className="skeleton-line skeleton-text" />
-            </div>
+      <DashboardShell title="Overview">
+        <div className="dash-stats">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="dash-stat-card dash-skeleton-card" aria-hidden="true" />
+          ))}
+        </div>
+        <div className="dash-panel">
+          <div className="loading-skeleton">
+            <div className="skeleton-line skeleton-title" />
+            <div className="skeleton-line skeleton-text" />
+            <div className="skeleton-line skeleton-text" />
           </div>
-        </section>
-      </main>
+        </div>
+      </DashboardShell>
     );
   }
 
@@ -329,104 +321,93 @@ export function DashboardClient() {
   const needsProfileCompletion = user && (!user.phone || !user.username);
 
   return (
-    <main>
-      <section className="page-hero">
-        <div className="page-hero-inner">
-          <p className="eyebrow">Dashboard</p>
-          <h1>Your SwiftMint account</h1>
-          <p>
-            Welcome back, {user?.name}. Place transfer orders, track their
-            status, and manage your payouts.
-          </p>
-        </div>
-      </section>
-
+    <DashboardShell title="Overview" subtitle={user?.name ? `Welcome back, ${user.name}` : undefined}>
       {needsProfileCompletion ? (
-        <div className="section" style={{ paddingTop: 0, paddingBottom: 0 }}>
-          <div className="dash-profile-prompt">
-            <User size={20} />
-            <div>
-              <strong>Complete your profile</strong>
-              <p>Add your phone number and set a username to get the most out of SwiftMint.</p>
-            </div>
-            <Link className="button button-primary" href="/profile" style={{ minHeight: 38, fontSize: "0.85rem" }}>
-              Complete profile
-            </Link>
+        <div className="dash-profile-prompt">
+          <User size={20} />
+          <div>
+            <strong>Complete your profile</strong>
+            <p>Add your phone number and set a username to get the most out of SwiftMint.</p>
           </div>
+          <Link className="button button-primary" href="/profile" style={{ minHeight: 38, fontSize: "0.85rem" }}>
+            Complete profile
+          </Link>
         </div>
       ) : null}
 
-      <section className="section" aria-label="Dashboard summary">
-        <div className="dash-stats">
-          <div className="dash-stat-card">
-            <span className="stat-icon"><Wallet size={22} /></span>
-            <strong className="stat-value">{formatCurrency(balance ?? 0)}</strong>
-            <span className="stat-label">Wallet balance</span>
-          </div>
-          <div className="dash-stat-card">
-            <span className="stat-icon"><TrendingUp size={22} /></span>
-            <strong className="stat-value">{allTransactions.length}</strong>
-            <span className="stat-label">Total orders</span>
-          </div>
-          <div className="dash-stat-card">
-            <span className="stat-icon"><CheckCircle2 size={22} /></span>
-            <strong className="stat-value">{completedCount}</strong>
-            <span className="stat-label">Completed payouts</span>
-          </div>
-          <div className="dash-stat-card">
-            <span className="stat-icon"><Clock3 size={22} /></span>
-            <strong className="stat-value">{pendingCount}</strong>
-            <span className="stat-label">Pending orders</span>
-          </div>
+      {/* Summary stats */}
+      <div className="dash-stats" aria-label="Account summary">
+        <div className="dash-stat-card dash-balance-card">
+          <span className="stat-icon"><Wallet size={22} /></span>
+          <strong className="stat-value">{formatCurrency(balance ?? 0)}</strong>
+          <span className="stat-label">Wallet balance</span>
         </div>
+        <div className="dash-stat-card">
+          <span className="stat-icon"><TrendingUp size={22} /></span>
+          <strong className="stat-value">{allTransactions.length}</strong>
+          <span className="stat-label">Total orders</span>
+        </div>
+        <div className="dash-stat-card">
+          <span className="stat-icon"><CheckCircle2 size={22} /></span>
+          <strong className="stat-value">{completedCount}</strong>
+          <span className="stat-label">Completed payouts</span>
+        </div>
+        <div className="dash-stat-card">
+          <span className="stat-icon"><Clock3 size={22} /></span>
+          <strong className="stat-value">{pendingCount}</strong>
+          <span className="stat-label">Pending orders</span>
+        </div>
+      </div>
 
-        <div className="dash-actions">
-          <Link className="button button-primary" href="/transfer">
-            <ArrowRight size={17} />
-            Place an order
-          </Link>
-          <Link className="button button-secondary" href="/pay">
-            <Smartphone size={17} />
-            Pay bills
-          </Link>
-          <Link className="button button-secondary" href="/dashboard#payment-info">
+      {/* Quick actions */}
+      <div className="dash-actions">
+        <Link className="button button-primary" href="/transfer">
+          <ArrowRight size={17} />
+          Place an order
+        </Link>
+        <Link className="button button-secondary" href="/pay">
+          <Smartphone size={17} />
+          Pay bills
+        </Link>
+        <a className="button button-secondary" href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">
+          <MessageCircle size={17} />
+          Order via WhatsApp
+        </a>
+        {filtered.length > 0 ? (
+          <button className="button button-secondary" type="button" onClick={exportCSV}>
             <Download size={17} />
-            Send to our number
-          </Link>
-          <a className="button button-secondary" href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">
-            <MessageCircle size={17} />
-            Order via WhatsApp
-          </a>
-          <Link className="button button-secondary" href="/profile">
-            <User size={17} />
-            Profile
-          </Link>
-          {isAdmin ? (
-            <Link className="button admin-link" href="/admin">
-              <ShieldCheck size={17} />
-              Admin
-            </Link>
-          ) : null}
-          {filtered.length > 0 ? (
-            <button className="button button-secondary" type="button" onClick={exportCSV}>
-              <Download size={17} />
-              Export CSV
-            </button>
-          ) : null}
-        </div>
+            Export CSV
+          </button>
+        ) : null}
+      </div>
 
-        <div className="dash-payment-info" id="payment-info" style={{ background: "var(--surface)", padding: "1.25rem 1.5rem", borderRadius: "var(--radius)", marginTop: "1.5rem" }}>
-          <strong style={{ display: "block", marginBottom: "0.5rem" }}>How it works:</strong>
-          <ol style={{ margin: 0, paddingLeft: "1.25rem", lineHeight: "1.8" }}>
-            <li>Send the money to one of our payment numbers below.</li>
-            <li>Place an order on this website or via WhatsApp with your payment details.</li>
-            <li>We confirm receipt and process the payout to your recipient.</li>
-          </ol>
-          <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.9rem" }}>
-            {getSettings().paymentMethods.map((m) => (
-              <span key={m}><strong>{m}:</strong> <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">{formattedWhatsappNumber}</a></span>
-            ))}
-          </div>
+      {/* How it works */}
+      <section className="dash-panel" id="payment-info">
+        <div className="dash-panel-head">
+          <h2 className="dash-panel-title">How it works</h2>
+        </div>
+        <ol className="dash-howto">
+          <li>Send the money to one of our payment numbers below.</li>
+          <li>Place an order on this website or via WhatsApp with your payment details.</li>
+          <li>We confirm receipt and process the payout to your recipient.</li>
+        </ol>
+        <div className="dash-paynums">
+          {getSettings().paymentMethods.map((m) => (
+            <span key={m}>
+              <strong>{m}:</strong>{" "}
+              <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">{formattedWhatsappNumber}</a>
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* Transactions */}
+      <section className="dash-panel">
+        <div className="dash-panel-head">
+          <h2 className="dash-panel-title">Transactions</h2>
+          {allTransactions.length > 0 ? (
+            <span className="dash-count">{filtered.length} transaction{filtered.length !== 1 ? "s" : ""}</span>
+          ) : null}
         </div>
 
         {fetchError ? (
@@ -486,7 +467,6 @@ export function DashboardClient() {
                   </button>
                 ))}
               </div>
-              <span className="dash-count">{filtered.length} transaction{filtered.length !== 1 ? "s" : ""}</span>
             </div>
 
             <div className="dash-table-wrap">
@@ -625,75 +605,55 @@ export function DashboardClient() {
         )}
       </section>
 
-      <section className="section dash-testimonials-section" aria-labelledby="testimonial-title">
-        <div className="section-heading">
-          <p className="eyebrow">Share your experience</p>
-          <h2 id="testimonial-title">Leave a testimonial</h2>
-          <p>Tell others what you think about SwiftMint. Your feedback helps us improve.</p>
+      {/* Testimonial */}
+      <section className="dash-panel">
+        <div className="dash-panel-head">
+          <h2 className="dash-panel-title">Leave a testimonial</h2>
+          <span className="dash-panel-sub">Your feedback helps us improve.</span>
         </div>
-        <div className="dash-testimonial-card">
-          {testimonialDone ? (
-            <div className="form-success">
-              <CheckCircle2 size={20} />
-              <span>Thank you! Your testimonial has been submitted and will appear once approved.</span>
-            </div>
-          ) : (
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!testimonialText.trim() || !token) return;
-              setTestimonialSubmitting(true);
-              setTestimonialError("");
-              try {
-                await apiCreateTestimonial(token, { text: testimonialText.trim() });
-                setTestimonialDone(true);
-                setTestimonialText("");
-              } catch (err) {
-                setTestimonialError(err instanceof Error ? err.message : "Submission failed");
-              } finally {
-                setTestimonialSubmitting(false);
-              }
-            }}>
-              {testimonialError ? <div className="form-error">{testimonialError}</div> : null}
-              <div className="dash-testimonial-field">
-                <label htmlFor="testimonial-textarea">Your testimonial</label>
-                <textarea
-                  id="testimonial-textarea"
-                  required
-                  rows={3}
-                  maxLength={500}
-                  placeholder="Share your experience with SwiftMint..."
-                  value={testimonialText}
-                  onChange={(e) => setTestimonialText(e.target.value)}
-                />
-                <div className="dash-testimonial-counter">{testimonialText.length}/500</div>
-              </div>
-              <div className="dash-testimonial-actions">
-                <button className="button button-primary" type="submit" disabled={testimonialSubmitting || !testimonialText.trim()}>
-                  {testimonialSubmitting ? <Loader2 className="spin" size={17} /> : <Star size={17} />}
-                  {testimonialSubmitting ? "Submitting..." : "Submit testimonial"}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </section>
-
-      <section className="dash-help-band" aria-labelledby="dash-help">
-        <div className="dash-help-inner">
-          <MessageCircle size={28} />
-          <div>
-            <h2 id="dash-help">Need help placing an order?</h2>
-            <p>
-              Contact SwiftMint on WhatsApp at <a href={`https://wa.me/${whatsappNumber}`} target="_blank" rel="noopener noreferrer">{formattedWhatsappNumber}</a> to place
-              an order, pay a bill, or get assistance with your transfers.
-            </p>
-            <p style={{ marginTop: 8 }}>
-              <Link href="/pay" style={{ color: "var(--accent)", fontWeight: 760, textDecoration: "underline", textUnderlineOffset: 2 }}>
-                Pay your bills online &rarr;
-              </Link>
-            </p>
+        {testimonialDone ? (
+          <div className="form-success">
+            <CheckCircle2 size={20} />
+            <span>Thank you! Your testimonial has been submitted and will appear once approved.</span>
           </div>
-        </div>
+        ) : (
+          <form onSubmit={async (e) => {
+            e.preventDefault();
+            if (!testimonialText.trim() || !token) return;
+            setTestimonialSubmitting(true);
+            setTestimonialError("");
+            try {
+              await apiCreateTestimonial(token, { text: testimonialText.trim() });
+              setTestimonialDone(true);
+              setTestimonialText("");
+            } catch (err) {
+              setTestimonialError(err instanceof Error ? err.message : "Submission failed");
+            } finally {
+              setTestimonialSubmitting(false);
+            }
+          }}>
+            {testimonialError ? <div className="form-error">{testimonialError}</div> : null}
+            <div className="dash-testimonial-field">
+              <label htmlFor="testimonial-textarea">Your testimonial</label>
+              <textarea
+                id="testimonial-textarea"
+                required
+                rows={3}
+                maxLength={500}
+                placeholder="Share your experience with SwiftMint..."
+                value={testimonialText}
+                onChange={(e) => setTestimonialText(e.target.value)}
+              />
+              <div className="dash-testimonial-counter">{testimonialText.length}/500</div>
+            </div>
+            <div className="dash-testimonial-actions">
+              <button className="button button-primary" type="submit" disabled={testimonialSubmitting || !testimonialText.trim()}>
+                {testimonialSubmitting ? <Loader2 className="spin" size={17} /> : <Star size={17} />}
+                {testimonialSubmitting ? "Submitting..." : "Submit testimonial"}
+              </button>
+            </div>
+          </form>
+        )}
       </section>
 
       {detailTxn ? (
@@ -711,6 +671,6 @@ export function DashboardClient() {
           }}
         />
       ) : null}
-    </main>
+    </DashboardShell>
   );
 }

@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { billers } from "@/lib/billers";
 import { whatsappNumber, formattedWhatsappNumber } from "@/lib/swiftmint";
 import { getSettings } from "@/lib/settings";
+import { DashboardShell } from "@/components/DashboardShell";
 
 function formatCurrency(n: number): string {
   return `MK ${n.toLocaleString("en-MW")}`;
@@ -83,32 +84,19 @@ export default function PayPage() {
 
   if (!loaded) {
     return (
-      <main>
-        <section className="page-hero">
-          <div className="page-hero-inner">
-            <div className="loading-skeleton">
-              <div className="skeleton-line skeleton-eyebrow" />
-              <div className="skeleton-line skeleton-title" />
-              <div className="skeleton-line skeleton-text" />
-            </div>
-          </div>
-        </section>
-      </main>
+      <DashboardShell title="Pay Bills">
+        <div className="loading-skeleton">
+          <div className="skeleton-line skeleton-title" />
+          <div className="skeleton-line skeleton-text" />
+          <div className="skeleton-line skeleton-text" />
+        </div>
+      </DashboardShell>
     );
   }
 
   return (
-    <main>
-      <section className="page-hero">
-        <div className="page-hero-inner">
-          <p className="eyebrow">Pay bills</p>
-          <h1>Pay your bills with SwiftMint</h1>
-          <p>
-            Pay Zuku TV, ESCOM electricity, airtime, and more. Send us the money
-            and we&apos;ll pay your bill.
-          </p>
-        </div>
-      </section>
+    <DashboardShell title="Pay Bills" subtitle="Pay Zuku TV, ESCOM, airtime and more">
+
 
       <section className="section">
         <div className="wallet-fund-layout">
@@ -264,6 +252,6 @@ export default function PayPage() {
           </aside>
         </div>
       </section>
-    </main>
+    </DashboardShell>
   );
 }

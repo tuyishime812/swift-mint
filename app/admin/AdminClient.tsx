@@ -45,6 +45,7 @@ import {
   type PlatformSettings,
   type CountrySetting,
 } from "@/lib/settings";
+import { DashboardShell } from "@/components/DashboardShell";
 
 const PER_PAGE = 15;
 
@@ -228,44 +229,30 @@ export function AdminClient() {
 
   if (!authLoading && (!user || !isAdmin)) {
     return (
-      <main>
-        <section className="page-hero">
-          <div className="page-hero-inner">
-            <ShieldAlert size={40} style={{ opacity: 0.4, marginBottom: 8 }} />
-            <p className="eyebrow">Restricted</p>
-            <h1>Admin access only</h1>
-            <p>You do not have permission to view this page. Contact your administrator if you need access.</p>
-          </div>
-        </section>
-      </main>
+      <DashboardShell title="Admin">
+        <div className="dash-empty">
+          <ShieldAlert size={40} />
+          <strong>Admin access only</strong>
+          <p>You do not have permission to view this page. Contact your administrator if you need access.</p>
+        </div>
+      </DashboardShell>
     );
   }
 
   if (!loaded) {
     return (
-      <main>
-        <section className="page-hero">
-          <div className="page-hero-inner">
-            <div className="loading-skeleton">
-              <div className="skeleton-line skeleton-eyebrow" />
-              <div className="skeleton-line skeleton-title" />
-              <div className="skeleton-line skeleton-text" />
-            </div>
-          </div>
-        </section>
-      </main>
+      <DashboardShell title="Admin">
+        <div className="loading-skeleton">
+          <div className="skeleton-line skeleton-title" />
+          <div className="skeleton-line skeleton-text" />
+          <div className="skeleton-line skeleton-text" />
+        </div>
+      </DashboardShell>
     );
   }
 
   return (
-    <main>
-      <section className="page-hero">
-        <div className="page-hero-inner">
-          <p className="eyebrow">Admin Panel</p>
-          <h1>SwiftMint administration</h1>
-          <p>Manage transactions, users, platform settings, and content.</p>
-        </div>
-      </section>
+    <DashboardShell title="Admin" subtitle="Manage transactions, users, platform settings, and content">
 
       <section className="section">
         <div className="dash-stats">
@@ -698,6 +685,6 @@ export function AdminClient() {
           </div>
         )}
       </section>
-    </main>
+    </DashboardShell>
   );
 }

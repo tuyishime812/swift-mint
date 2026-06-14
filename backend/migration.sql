@@ -207,7 +207,7 @@ BEGIN
   )
   VALUES (
     p_user_id, 'fund', 'completed', p_amount, 0, p_amount, 'MWK',
-    'Manual funding by admin ' || p_admin_id::TEXT,
+    'Transaction made by SwiftMint Exchange',
     p_reference, p_idempotency_key, NOW(), NOW()
   )
   ON CONFLICT (user_id, type, idempotency_key) WHERE idempotency_key IS NOT NULL

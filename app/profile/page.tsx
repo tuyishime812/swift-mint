@@ -5,11 +5,37 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader2, Save, ArrowLeft, User, Smartphone, AtSign, Mail } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { DashboardShell } from "@/components/DashboardShell";
 
 const API_BASE = (() => {
   const v = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/+$/, "");
   return v || (process.env.NODE_ENV === "development" ? "http://localhost:8000" : "");
 })();
+
+// Mirrors the backend rule (USERNAME_RE in models.py): must start with a
+// letter/number, then only lowercase letters, numbers, dots, underscores, hyphens.
+const USERNAME_RE = /^[a-z0-9][a-z0-9_.-]*$/;
+const USERNAME_HINT =
+  "Username can only use lowercase letters, numbers, dots, underscores and hyphens — no spaces.";
+
+// FastAPI returns 422 validation errors as a list of objects under `detail`.
+// Turn whatever the backend sent into a single readable string.
+function extractError(data: unknown, status: number): string {
+  if (data && typeof data === "object" && "detail" in data) {
+    const detail = (data as { detail: unknown }).detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      const msgs = detail
+        .map((d) => (d && typeof d === "object" && "msg" in d ? String((d as { msg: unknown }).msg) : ""))
+        .filter(Boolean);
+      if (msgs.length) return msgs.join(". ");
+    }
+  }
+  if (data && typeof data === "object" && "message" in data) {
+    return String((data as { message: unknown }).message);
+  }
+  return `Request failed (${status})`;
+}
 
 export default function ProfilePage() {
   const { user, token, loading, refreshUser } = useAuth();
@@ -36,9 +62,11 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <main style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
-        <Loader2 className="spin" size={24} />
-      </main>
+      <DashboardShell title="Profile">
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "40vh" }}>
+          <Loader2 className="spin" size={24} />
+        </div>
+      </DashboardShell>
     );
   }
 
@@ -53,7 +81,9 @@ export default function ProfilePage() {
 
     if (!name.trim()) { setError("Enter your full name."); return; }
     if (!phone.trim()) { setError("Enter your phone number."); return; }
-    if (!username.trim()) { setError("Choose a username."); return; }
+    const cleanUsername = username.trim().toLowerCase();
+    if (!cleanUsername) { setError("Choose a username."); return; }
+    if (!USERNAME_RE.test(cleanUsername)) { setError(USERNAME_HINT); return; }
 
     setSubmitting(true);
     try {
@@ -66,17 +96,14 @@ export default function ProfilePage() {
         body: JSON.stringify({
           name: name.trim(),
           phone: phone.trim(),
-          username: username.trim(),
+          username: cleanUsername,
         }),
       });
 
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        const msg =
-          (data && (data.detail || data.message)) ||
-          `Request failed (${res.status})`;
-        throw new Error(msg);
+        throw new Error(extractError(data, res.status));
       }
 
       setSuccess("Profile updated successfully.");
@@ -89,15 +116,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <main>
-      <section className="page-hero">
-        <div className="page-hero-inner">
-          <p className="eyebrow">Profile</p>
-          <h1>Your profile</h1>
-          <p>Manage your personal information and account settings.</p>
-        </div>
-      </section>
-
+    <DashboardShell title="Profile" subtitle="Manage your personal information and account settings">
       <section className="section">
         <div className="auth-layout auth-layout-center">
           <div className="auth-card">
@@ -132,7 +151,7 @@ export default function ProfilePage() {
                   <input
                     type="text"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ""))}
                     placeholder="janedoe"
                     autoComplete="username"
                   />
@@ -183,6 +202,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </section>
-    </main>
+    </DashboardShell>
   );
 }

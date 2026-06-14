@@ -16,6 +16,7 @@ import { getSettings } from "@/lib/settings";
 import { type TransferRequestInput, whatsappNumber, formattedWhatsappNumber, countries } from "@/lib/swiftmint";
 import { apiSendMoney } from "@/lib/api";
 import { fetchFxRates, getFxRate, convertMwK } from "@/lib/fx";
+import { DashboardShell } from "@/components/DashboardShell";
 
 function formatCurrency(n: number): string {
   return `MK ${n.toLocaleString("en-MW")}`;
@@ -142,18 +143,7 @@ export default function TransferPage() {
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(buildWhatsAppMessage())}`;
 
   return (
-    <main>
-      <section className="page-hero">
-        <div className="page-hero-inner">
-          <p className="eyebrow">Place an order</p>
-          <h1>Send mobile wallet payouts</h1>
-          <p>
-            Send money to our payment number, then submit your order. We confirm
-            receipt and process the payout to your recipient.
-          </p>
-        </div>
-      </section>
-
+    <DashboardShell title="Send Money" subtitle="Send mobile wallet payouts to 37+ countries">
       <section className="section">
         <div className="wallet-fund-layout">
           <div className="auth-card">
@@ -316,6 +306,6 @@ export default function TransferPage() {
           </aside>
         </div>
       </section>
-    </main>
+    </DashboardShell>
   );
 }
